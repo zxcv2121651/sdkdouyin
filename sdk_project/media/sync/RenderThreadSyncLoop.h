@@ -1,24 +1,23 @@
 #pragma once
 #include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
-#include <queue>
 #include <memory>
 #include "AVSyncClock.h"
 #include "../codec/SoftwareVideoDecoder.h"
+#include "core/utils/LockFreeRingBuffer.h"
 
 namespace video_sdk {
 namespace media {
 
 /**
  * @brief 渲染线程同步循环引擎。
- * 负责接收解码后的 VideoFrame，依据 AVSyncClock 的时间戳对比决定：
- * 渲染(Render)、休眠等待(Wait) 或 丢帧(Drop)。
+ * 核心升级：不再使用带锁的 std::queue，而是使用 LockFreeRingBuffer
+ * 实现极低延迟的解码-渲染数据传递。
  */
 class RenderThreadSyncLoop {
 public:
-    RenderThreadSyncLoop(std::shared_ptr<AVSyncClock> masterClock);
+    // 默认给 RingBuffer 分配 10 帧的缓冲空间
+    RenderThreadSyncLoop(std::shared_ptr<AVSyncClock> masterClock, size_t bufferSize = 10);
     ~RenderThreadSyncLoop();
 
     // 启动渲染循环线程
@@ -27,8 +26,9 @@ public:
     // 停止渲染循环
     void stop();
 
-    // 外部解码器将解码完成的帧送入渲染队列
-    void enqueueFrame(const VideoFrame& frame);
+    // 解码线程调用：将解码完成的帧送入无锁渲染队列
+    // 如果队列满了，会返回 false，解码线程可以稍作休眠重试 (自旋锁概念)
+    bool enqueueFrame(const VideoFrame& frame);
 
 private:
     void threadLoop();
@@ -40,9 +40,8 @@ private:
     std::thread m_renderThread;
     std::atomic<bool> m_isRunning{false};
 
-    std::mutex m_queueMutex;
-    std::condition_variable m_queueCondVar;
-    std::queue<VideoFrame> m_frameQueue;
+    // 工业级替换：基于 C++11 std::atomic 的无锁环形队列
+    core::LockFreeRingBuffer<VideoFrame> m_frameQueue;
 
     // 视频同步容差阈值 (毫秒)
     const int64_t SYNC_THRESHOLD_MIN = -15; // 滞后超过15ms考虑丢帧

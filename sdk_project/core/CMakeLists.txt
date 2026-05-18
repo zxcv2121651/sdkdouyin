@@ -5,6 +5,7 @@ file(GLOB_RECURSE CORE_SRC
     "timeline/*.cpp"
     "audio/*.cpp"
     "utils/*.cpp"
+    "utils/dummy.cpp"
     "math/*.cpp"
 )
 

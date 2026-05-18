@@ -8,43 +8,45 @@
 using namespace video_sdk::media;
 
 int main() {
-    std::cout << "--- Starting A/V Sync Engine Test ---" << std::endl;
+    std::cout << "--- Starting LockFree A/V Sync Engine Test ---" << std::endl;
 
-    // 1. 初始化主时钟 (以 0 为起点)
     auto masterClock = std::make_shared<AVSyncClock>();
     masterClock->setClock(0);
 
-    // 2. 初始化并启动渲染线程
-    RenderThreadSyncLoop renderLoop(masterClock);
+    // 设置 RingBuffer 容量为 3 (非常小，以便我们测试积压时的反压机制)
+    RenderThreadSyncLoop renderLoop(masterClock, 3);
     renderLoop.start();
 
-    // 3. 模拟视频解码线程，以固定的速度产生帧
-    // 假设 30FPS，每帧应间隔约 33.3ms
-    for (int i = 0; i < 5; ++i) {
+    // 模拟极高并发的解码线程推帧
+    for (int i = 0; i < 6; ++i) {
         VideoFrame frame{};
-        frame.pts = i * 33; // 视频的时间戳: 0, 33, 66, 99, 132
+        frame.pts = i * 33;
 
-        if (i == 2) {
-            // 模拟解码器卡顿导致第3帧严重滞后 (主时钟已经跑到100ms+了，但解码出来的依然是 66ms 的视频)
-            std::cout << "[Decoder] Simulating heavy lag for frame " << i << "..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        } else if (i == 4) {
-            // 模拟解码器超前解码 (主时钟还没到，视频先解出来了)
-            std::cout << "[Decoder] Decoder is too fast for frame " << i << "..." << std::endl;
-            // 不 sleep，直接喂给渲染队列
-        } else {
-            // 正常速度解码
-            std::this_thread::sleep_for(std::chrono::milliseconds(33));
+        // 尝试非阻塞的推入无锁队列
+        bool success = false;
+        int retries = 0;
+        while (!success && retries < 5) {
+            success = renderLoop.enqueueFrame(frame);
+            if (!success) {
+                std::cout << "[Decoder] RingBuffer FULL! Frame " << i << " blocked. Retrying..." << std::endl;
+                // 反压机制 (Backpressure)：队列满时，解码器必须休眠等待渲染消耗
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                retries++;
+            }
         }
 
-        std::cout << "[Decoder] Pushing frame " << i << " with PTS: " << frame.pts << "ms" << std::endl;
-        renderLoop.enqueueFrame(frame);
+        if(success) {
+            std::cout << "[Decoder] Successfully pushed frame " << i << " PTS: " << frame.pts << "ms" << std::endl;
+        } else {
+            std::cout << "[Decoder] Failed to push frame " << i << " after retries. Dropping at decoder layer." << std::endl;
+        }
+
+        // 模拟解码极快，不休眠直接下一帧
     }
 
-    // 等待渲染队列处理完毕
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     renderLoop.stop();
-    std::cout << "--- A/V Sync Engine Test Finished ---" << std::endl;
+    std::cout << "--- LockFree A/V Sync Engine Test Finished ---" << std::endl;
     return 0;
 }
