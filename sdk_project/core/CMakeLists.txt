@@ -1,5 +1,7 @@
 file(GLOB_RECURSE CORE_SRC
     "engine/*.cpp"
+    "engine/GlMock.cpp"
+    "engine/OesToRgbFilter.cpp"
     "timeline/*.cpp"
     "audio/*.cpp"
     "utils/*.cpp"

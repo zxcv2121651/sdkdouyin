@@ -1,6 +1,7 @@
 file(GLOB_RECURSE RHI_SRC
     "interface/*.cpp"
     "gles/*.cpp"
+    "gles/EGLCore.cpp"
 )
 
 # conditional logic for other platforms
