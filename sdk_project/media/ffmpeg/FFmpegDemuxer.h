@@ -3,21 +3,25 @@
 #include <vector>
 #include <cstdint>
 
+// 前置声明
+struct AVFormatContext;
+struct AVPacket;
+
 namespace video_sdk {
 namespace media {
 
-// 模拟的 Packet 结构，实际使用时对应 AVPacket
+// 模拟的 Packet 结构，实际使用时映射 AVPacket
 struct MediaPacket {
-    uint8_t* data;
-    int size;
-    int64_t pts;
-    int64_t dts;
-    int streamIndex;
-    bool isKeyFrame;
+    uint8_t* data = nullptr;
+    int size = 0;
+    int64_t pts = 0;
+    int64_t dts = 0;
+    int streamIndex = -1;
+    bool isKeyFrame = false;
 };
 
 /**
- * @brief FFmpeg 解封装器。
+ * @brief FFmpeg 解封装器深度实现。
  * 负责打开音视频文件（使用 libavformat），解析出 Stream 信息，
  * 并将数据解复用为音频和视频的 Packet 队列。
  */
@@ -42,12 +46,16 @@ public:
     // 跳转到指定时间 (Seek)
     void seekTo(int64_t timestampMs);
 
+    // 暴露内部的上下文给外部 Decoder 获取参数
+    AVFormatContext* getFormatContext() const { return m_formatCtx; }
+
 private:
     std::string m_filePath;
     int m_videoStreamIndex = -1;
     int m_audioStreamIndex = -1;
 
-    // 占位：实际开发时需要包含 AVFormatContext* 等 FFmpeg 结构体
+    AVFormatContext* m_formatCtx = nullptr;
+    AVPacket* m_pkt = nullptr;
 };
 
 } // namespace media

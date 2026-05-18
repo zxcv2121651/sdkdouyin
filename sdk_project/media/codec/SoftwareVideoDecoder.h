@@ -2,14 +2,18 @@
 #include <string>
 #include <cstdint>
 
+// 前置声明
+struct AVCodecContext;
+struct AVFrame;
+struct AVPacket;
+
 namespace video_sdk {
 namespace media {
 
 // 模拟解码后的视频帧数据
 struct VideoFrame {
-    uint8_t* yData;
-    uint8_t* uData;
-    uint8_t* vData;
+    uint8_t* data[8];    // 多平面指针 (如 YUV 的 Y/U/V 平面)
+    int linesize[8];     // 每行的步长 (stride)
     int width;
     int height;
     int64_t pts;
@@ -24,21 +28,23 @@ public:
     SoftwareVideoDecoder();
     ~SoftwareVideoDecoder();
 
-    // 初始化解码器，传入流信息中的解码器上下文参数
-    bool initialize(const std::string& codecName);
+    // 根据 CodecId 和额外的参数（如 CodecParameters）初始化解码器
+    bool initialize(uint32_t codecId);
 
     // 释放解码器
     void destroy();
 
-    // 接收解封装器分离出的 Packet，送入解码器 (avcodec_send_packet)
-    bool sendPacket(const uint8_t* data, int size, int64_t pts);
+    // 接收解封装器分离出的 Packet，送入解码器
+    // data 对应 AVPacket.data
+    bool sendPacket(const uint8_t* data, int size, int64_t pts, int64_t dts);
 
-    // 从解码器获取解码后的原始 YUV 帧 (avcodec_receive_frame)
-    // 返回值表示是否成功获取到帧
+    // 从解码器获取解码后的原始帧 (如 YUV420P)
     bool receiveFrame(VideoFrame& outFrame);
 
 private:
-    // FFmpeg 结构体占位: AVCodecContext*, AVCodec*, AVFrame* 等
+    AVCodecContext* m_codecCtx = nullptr;
+    AVFrame* m_frame = nullptr;
+    AVPacket* m_pkt = nullptr;
     bool m_isInitialized = false;
 };
 

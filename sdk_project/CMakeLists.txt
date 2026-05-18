@@ -14,6 +14,7 @@ endif()
 
 # Global include directories
 include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ffmpeg_mock
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
