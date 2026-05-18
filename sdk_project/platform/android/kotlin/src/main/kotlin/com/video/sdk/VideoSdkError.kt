@@ -1,7 +1,8 @@
 package com.video.sdk
 
 /**
- * Sealed class representing domain-specific SDK errors mapped from C++ JNI layer.
+ * 这是一个密封类（Sealed class），用于表示从 C++ JNI 层映射过来的 SDK 领域特定错误。
+ * 统一了底层的异常向 Kotlin 层的安全抛出。
  */
 sealed class VideoSdkError(val code: Int, message: String) : Exception(message) {
     class InitializationError(message: String) : VideoSdkError(1001, message)

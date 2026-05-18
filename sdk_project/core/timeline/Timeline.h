@@ -8,31 +8,31 @@
 namespace video_sdk {
 namespace core {
 
-class Clip; // Forward declaration
+class Clip; // 前置声明
 
 /**
- * @brief Timeline is the core NLE (Non-Linear Editing) engine component.
- * It manages tracks, clips, and overall state.
+ * @brief Timeline 是核心的非编（NLE）引擎组件。
+ * 负责管理轨道（tracks）、片段（clips）及整体状态。
  */
 class Timeline {
 public:
     Timeline();
     ~Timeline();
 
-    // Add a clip to the timeline
+    // 向时间线添加片段
     void addClip(const std::string& trackId, std::shared_ptr<Clip> clip);
 
-    // Get clips overlapping a specific time (efficient query)
+    // 获取特定时间重叠的所有片段（高效查询）
     std::vector<std::shared_ptr<Clip>> getClipsAtTime(int64_t timeMs);
 
 private:
-    // Shared mutex for reader-writer locking
+    // 共享互斥锁，用于读写锁分离，保证线程安全
     mutable std::shared_mutex m_mutex;
 
-    // O(1) lookup by ID
+    // 通过 ID 进行 O(1) 查找的哈希表
     std::unordered_map<std::string, std::shared_ptr<Clip>> m_clipMap;
 
-    // Ordered by timelineIn for efficient intersection tests
+    // 按 timelineIn（时间线入点）排序，用于高效的区间相交检测
     std::vector<std::shared_ptr<Clip>> m_orderedClips;
 };
 

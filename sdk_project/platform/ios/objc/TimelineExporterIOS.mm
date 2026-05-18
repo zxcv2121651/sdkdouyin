@@ -3,7 +3,7 @@
 @implementation TimelineExporterIOS
 
 - (void)startExport {
-    // Setup EAGLContext in a background queue
+    // 在后台队列中配置 EAGLContext
 }
 
 - (void)cancelExport {

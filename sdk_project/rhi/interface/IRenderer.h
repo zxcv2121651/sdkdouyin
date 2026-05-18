@@ -6,8 +6,8 @@ namespace video_sdk {
 namespace rhi {
 
 /**
- * @brief IRenderer is the hardware abstraction layer for rendering.
- * Provides unified interfaces for OpenGL ES, Vulkan, and Metal.
+ * @brief IRenderer 是渲染引擎的硬件抽象层（HAL）。
+ * 为 OpenGL ES、Vulkan 和 Metal 提供统一的操作接口。
  */
 class IRenderer {
 public:
@@ -16,11 +16,11 @@ public:
     virtual void initialize() = 0;
     virtual void destroy() = 0;
 
-    // FBO Management
+    // FBO (帧缓冲对象) 管理
     virtual uint32_t acquireFBO(int width, int height) = 0;
     virtual void releaseFBO(uint32_t fboId) = 0;
 
-    // Shader Management
+    // Shader (着色器) 管理
     virtual uint32_t compileShader(const std::string& vertexSource, const std::string& fragmentSource) = 0;
 };
 
