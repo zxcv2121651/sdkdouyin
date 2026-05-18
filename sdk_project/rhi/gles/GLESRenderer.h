@@ -3,13 +3,12 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <memory>
+#include <mutex>
 
 namespace video_sdk {
 namespace rhi {
 
-/**
- * @brief GLES 特性等级枚举，用于动态适配不同硬件能力
- */
 enum class GLESVersion {
     GLES_2_0,
     GLES_3_0,
@@ -19,8 +18,7 @@ enum class GLESVersion {
 };
 
 /**
- * @brief OpenGL ES 的渲染器具体实现。
- * 包含动态版本探测、Shader 宏动态分发以及 FBO 缓存池。
+ * @brief OpenGL ES 渲染器实现。包含 FBO 池化及 Compute Shader 支持。
  */
 class GLESRenderer : public IRenderer {
 public:
@@ -30,25 +28,26 @@ public:
     void initialize() override;
     void destroy() override;
 
-    uint32_t acquireFBO(int width, int height) override;
-    void releaseFBO(uint32_t fboId) override;
+    FrameBufferObject* acquireFBO(int width, int height) override;
+    void releaseFBO(FrameBufferObject* fbo) override;
 
     uint32_t compileShader(const std::string& vertexSource, const std::string& fragmentSource) override;
+    uint32_t compileComputeShader(const std::string& computeSource) override;
+    void dispatchCompute(uint32_t programId, int numGroupsX, int numGroupsY, int numGroupsZ) override;
 
-    // 获取当前探测到的 GLES 版本
     GLESVersion getVersion() const { return m_currentVersion; }
 
 private:
-    // 解析 GLES 版本字符串
     void detectCapability();
-
-    // 根据当前 GLES 版本动态注入 Shader 宏
     std::string injectShaderMacros(const std::string& source, bool isVertexShader);
+
+    // 内部创建真实 FBO 的逻辑
+    FrameBufferObject* createFBOInternal(int width, int height);
 
 private:
     GLESVersion m_currentVersion = GLESVersion::UNKNOWN;
+    std::mutex m_fboMutex;
 
-    // 统一的 FBO 缓存池：std::unordered_map 与轻量级 struct key O(1) 查找
     struct FBOKey {
         int width;
         int height;
@@ -57,14 +56,14 @@ private:
         }
     };
 
-    // Hash function for FBOKey
     struct FBOKeyHash {
         std::size_t operator()(const FBOKey& k) const {
             return std::hash<int>()(k.width) ^ (std::hash<int>()(k.height) << 1);
         }
     };
 
-    std::unordered_map<FBOKey, std::vector<uint32_t>, FBOKeyHash> m_fboPool;
+    // FBO 缓冲池：Key 是宽高，Value 是可复用的 FBO 列表
+    std::unordered_map<FBOKey, std::vector<std::unique_ptr<FrameBufferObject>>, FBOKeyHash> m_fboPool;
 };
 
 } // namespace rhi

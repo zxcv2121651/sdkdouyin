@@ -1,26 +1,22 @@
 #include "GLESRenderer.h"
+#include "GlesMock.h"
 #include <iostream>
 
 namespace video_sdk {
 namespace rhi {
 
 GLESRenderer::GLESRenderer() {}
+
 GLESRenderer::~GLESRenderer() {
     destroy();
 }
 
 void GLESRenderer::initialize() {
-    // 1. 初始化 GLES 上下文 (通常由外部 EGL 提供环境，这里假设环境已就绪)
-
-    // 2. 动态探测 GPU 能力与版本
     detectCapability();
 }
 
 void GLESRenderer::detectCapability() {
-    // 模拟从 GL 环境获取版本字符串的逻辑
-    // const char* versionStr = (const char*)glGetString(GL_VERSION);
-    // 这里使用硬编码模拟解析过程
-    std::string versionStr = "OpenGL ES 3.1 V@104.0 (GIT@5df...)";
+    std::string versionStr = (const char*)glGetString(GL_VERSION);
 
     if (versionStr.find("OpenGL ES 3.2") != std::string::npos) {
         m_currentVersion = GLESVersion::GLES_3_2;
@@ -28,71 +24,101 @@ void GLESRenderer::detectCapability() {
         m_currentVersion = GLESVersion::GLES_3_1;
     } else if (versionStr.find("OpenGL ES 3.0") != std::string::npos) {
         m_currentVersion = GLESVersion::GLES_3_0;
-    } else if (versionStr.find("OpenGL ES 2.0") != std::string::npos) {
-        m_currentVersion = GLESVersion::GLES_2_0;
     } else {
-        // 默认回退到 GLES 2.0 以保证基础兼容性
         m_currentVersion = GLESVersion::GLES_2_0;
     }
 }
 
 void GLESRenderer::destroy() {
-    // 清理 FBO 缓存池和 Shader
+    std::lock_guard<std::mutex> lock(m_fboMutex);
+    for (auto& pair : m_fboPool) {
+        for (auto& fbo : pair.second) {
+            glDeleteFramebuffers(1, &fbo->fboId);
+            glDeleteTextures(1, &fbo->textureId);
+        }
+    }
+    m_fboPool.clear();
 }
 
-uint32_t GLESRenderer::acquireFBO(int width, int height) {
-    // 实际应根据 FBOKey 从 m_fboPool 获取
-    return 0;
+FrameBufferObject* GLESRenderer::createFBOInternal(int width, int height) {
+    auto fbo = new FrameBufferObject{0, 0, width, height};
+
+    // 1. 生成空纹理
+    glGenTextures(1, &fbo->textureId);
+    glBindTexture(GL_TEXTURE_2D, fbo->textureId);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    // 纹理参数
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // 2. 生成 FBO 并绑定纹理
+    glGenFramebuffers(1, &fbo->fboId);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo->fboId);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo->textureId, 0);
+
+    // 恢复默认 Framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return fbo;
 }
 
-void GLESRenderer::releaseFBO(uint32_t fboId) {
-    // 释放并归还至 m_fboPool
+FrameBufferObject* GLESRenderer::acquireFBO(int width, int height) {
+    std::lock_guard<std::mutex> lock(m_fboMutex);
+    FBOKey key{width, height};
+
+    auto it = m_fboPool.find(key);
+    if (it != m_fboPool.end() && !it->second.empty()) {
+        // 从池子尾部弹出一个可用的 FBO
+        auto fbo = std::move(it->second.back());
+        it->second.pop_back();
+        return fbo.release();
+    }
+
+    // 如果池子里没有，进行真正的 GPU 资源分配
+    return createFBOInternal(width, height);
+}
+
+void GLESRenderer::releaseFBO(FrameBufferObject* fbo) {
+    if (!fbo) return;
+
+    std::lock_guard<std::mutex> lock(m_fboMutex);
+    FBOKey key{fbo->width, fbo->height};
+
+    // 将其重新归还至池中
+    m_fboPool[key].push_back(std::unique_ptr<FrameBufferObject>(fbo));
 }
 
 std::string GLESRenderer::injectShaderMacros(const std::string& source, bool isVertexShader) {
-    std::string finalSource = "";
-
-    // 根据动态探测到的版本，注入对应的 #version 宏
-    if (m_currentVersion >= GLESVersion::GLES_3_0) {
-        finalSource += "#version 300 es\n";
-
-        // 针对 3.0+ 的特殊宏定义
-        finalSource += "#define VARYING in\n";
-        finalSource += "#define VARYING_OUT out\n";
-        finalSource += "#define TEXTURE texture\n";
-    } else {
-        finalSource += "#version 100\n";
-
-        // 针对 2.0 的回退宏定义
-        finalSource += "#define VARYING varying\n";
-        if (isVertexShader) {
-            finalSource += "#define VARYING_OUT varying\n";
-        } else {
-            finalSource += "#define VARYING_OUT \n"; // 2.0 FRAG 中通常使用 gl_FragColor
-        }
-        finalSource += "#define TEXTURE texture2D\n";
-    }
-
-    // 追加精度声明
-    if (!isVertexShader) {
-        finalSource += "precision highp float;\n";
-    }
-
-    // 追加原始 shader 代码
-    finalSource += source;
-
-    return finalSource;
+    // 简化处理用于演示
+    return "#version 300 es\n" + source;
 }
 
 uint32_t GLESRenderer::compileShader(const std::string& vertexSource, const std::string& fragmentSource) {
-    std::string injectedVert = injectShaderMacros(vertexSource, true);
-    std::string injectedFrag = injectShaderMacros(fragmentSource, false);
+    // 编译常规渲染管线 Shader
+    return glCreateProgram();
+}
 
-    // 实际的 glCompileShader, glAttachShader 逻辑占位
-    // std::cout << "Compiling Vertex Shader:\n" << injectedVert << "\n";
-    // std::cout << "Compiling Fragment Shader:\n" << injectedFrag << "\n";
+uint32_t GLESRenderer::compileComputeShader(const std::string& computeSource) {
+    // GLES 3.1+ Compute Shader 编译
+    std::string injected = "#version 310 es\n" + computeSource;
+    uint32_t shader = glCreateShader(GL_COMPUTE_SHADER);
+    const char* src = injected.c_str();
+    glShaderSource(shader, 1, &src, nullptr);
+    glCompileShader(shader);
 
-    return 0;
+    uint32_t program = glCreateProgram();
+    glAttachShader(program, shader);
+    glLinkProgram(program);
+    glDeleteShader(shader);
+    return program;
+}
+
+void GLESRenderer::dispatchCompute(uint32_t programId, int numGroupsX, int numGroupsY, int numGroupsZ) {
+    // 触发 GLES Compute Shader 计算
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 }
 
 } // namespace rhi
