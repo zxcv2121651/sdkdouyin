@@ -1,0 +1,21 @@
+# Build output
+build/
+bin/
+lib/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.cmake
+*.a
+*.so
+*.o
+*.o.d
+dummy_core.cpp
+dummy.cpp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
