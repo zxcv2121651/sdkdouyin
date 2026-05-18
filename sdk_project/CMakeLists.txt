@@ -22,6 +22,7 @@ include_directories(
 add_subdirectory(core)
 add_subdirectory(rhi)
 add_subdirectory(hal)
+add_subdirectory(media)
 add_subdirectory(modules)
 
 # Build a dummy source for the main shared library so it isn't empty
@@ -36,6 +37,7 @@ target_link_libraries(VideoSDKCore
     VideoCore
     VideoRHI
     VideoHAL
+    VideoMedia
     VideoModules
 )
 
