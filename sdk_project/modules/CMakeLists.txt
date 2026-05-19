@@ -1,5 +1,6 @@
 file(GLOB_RECURSE MODULES_SRC
-    "camera/*.cpp"
+    "camera/CameraCapture.cpp"
+    "camera/CameraCaptureAndroid.cpp"
     "editor/*.cpp"
     "effect/*.cpp"
     "player/*.cpp"

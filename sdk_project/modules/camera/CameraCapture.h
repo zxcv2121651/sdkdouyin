@@ -1,19 +1,18 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <memory>
 
 namespace video_sdk {
 namespace modules {
 
-/**
- * @brief 视频帧回调定义。
- * 采集到的纹理ID或YUV数据通过该回调传递给渲染引擎进行美颜或直接录制。
- */
 using OnFrameAvailableCallback = std::function<void(uint32_t textureId, int64_t timestampMs)>;
 
+class ICameraCaptureImpl; // 隐藏平台特定实现
+
 /**
- * @brief 极速录制采集模块。
- * 负责与双端的底层硬件 API 交互（如 Android 的 Camera2/SurfaceTexture，iOS 的 AVCaptureSession/CVPixelBuffer）。
+ * @brief 极速录制采集模块 (基于 PIMPL 模式设计)。
+ * 隐藏底层复杂的 NDK Camera2 / iOS AVFoundation 逻辑，保证业务层头文件纯净。
  */
 class CameraCapture {
 public:
@@ -36,11 +35,18 @@ public:
     void setFrameCallback(OnFrameAvailableCallback callback);
 
 private:
-    int m_width;
-    int m_height;
-    int m_fps;
-    bool m_isPreviewing = false;
-    OnFrameAvailableCallback m_frameCallback;
+    std::unique_ptr<ICameraCaptureImpl> m_impl;
+};
+
+// ----------------- PIMPL 内部接口定义 -----------------
+class ICameraCaptureImpl {
+public:
+    virtual ~ICameraCaptureImpl() = default;
+    virtual bool initialize(int width, int height, int fps) = 0;
+    virtual void startPreview() = 0;
+    virtual void stopPreview() = 0;
+    virtual void switchCamera() = 0;
+    virtual void setFrameCallback(OnFrameAvailableCallback callback) = 0;
 };
 
 } // namespace modules
