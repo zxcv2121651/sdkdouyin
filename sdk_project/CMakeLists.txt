@@ -5,34 +5,31 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Platform detection
 if(ANDROID)
     message(STATUS "Building for Android")
 elseif(APPLE)
     message(STATUS "Building for Apple (iOS/macOS)")
 endif()
 
-# Global include directories
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ffmpeg_mock
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ffmpeg_mock
 )
 
-# Subdirectories
 add_subdirectory(core)
 add_subdirectory(rhi)
 add_subdirectory(hal)
 add_subdirectory(media)
 add_subdirectory(modules)
 
-# Build a dummy source for the main shared library so it isn't empty
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/dummy_core.cpp "void dummy_main_core(){}")
+# 为了创建一个不报错的 SHARED 库，我们需要提供至少一个源文件，创建一个正式的入口文件
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/VideoSDKEntry.cpp "
+#include <iostream>
+void video_sdk_init() { std::cout << \"Video SDK Initialized\" << std::endl; }
+")
 
-# Build the core shared library
-add_library(VideoSDKCore SHARED ${CMAKE_CURRENT_BINARY_DIR}/dummy_core.cpp)
+add_library(VideoSDKCore SHARED ${CMAKE_CURRENT_BINARY_DIR}/VideoSDKEntry.cpp)
 
-# Link sub-targets to the main library
 target_link_libraries(VideoSDKCore
     PRIVATE
     VideoCore

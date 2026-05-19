@@ -1,1 +1,0 @@
-void hal_dummy(){}
