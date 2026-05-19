@@ -34,6 +34,8 @@ private:
     // Shader 内部 Uniform 定位
     int m_matrixLoc = -1;
     int m_textureLoc = -1;
+    int m_posLoc = -1;
+    int m_coordLoc = -1;
 };
 
 } // namespace core

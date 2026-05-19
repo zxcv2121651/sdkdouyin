@@ -1,9 +1,16 @@
 #pragma once
 #include <string>
 #include <memory>
+#include <vector>
+#include "core/engine/FilterEngine.h"
 
 namespace video_sdk {
 namespace modules {
+
+struct FilterConfig {
+    std::string name;
+    float intensity;
+};
 
 /**
  * @brief 特效管理器，负责调度底层的 FilterEngine。
@@ -11,7 +18,7 @@ namespace modules {
  */
 class EffectManager {
 public:
-    EffectManager();
+    EffectManager(std::shared_ptr<core::FilterEngine> engine);
     ~EffectManager();
 
     // 加载全局美颜参数（如：磨皮、瘦脸、大眼）
@@ -23,13 +30,18 @@ public:
     // 移除所有特效
     void clearAllEffects();
 
+    // 被 RenderGraph 或 Player 调用：依次执行已挂载的特效
+    void processEffects(uint32_t inputTextureId, uint32_t outputTextureId, int width, int height);
+
 private:
     float m_smoothingLevel = 0.0f;
     float m_faceSlimmingLevel = 0.0f;
     float m_eyeEnlargingLevel = 0.0f;
 
-    // 依赖注入：指向核心 FilterEngine 的指针
-    // std::shared_ptr<core::FilterEngine> m_filterEngine;
+    std::shared_ptr<core::FilterEngine> m_filterEngine;
+
+    // 挂载的滤镜队列
+    std::vector<FilterConfig> m_activeFilters;
 };
 
 } // namespace modules

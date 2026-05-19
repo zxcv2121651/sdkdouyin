@@ -1,1 +1,0 @@
-void rhi_dummy(){}
