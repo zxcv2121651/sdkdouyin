@@ -12,6 +12,7 @@ elseif(APPLE)
 endif()
 
 include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/vulkan_mock
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ffmpeg_mock
 )
