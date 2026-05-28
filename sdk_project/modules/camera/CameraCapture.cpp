@@ -1,6 +1,5 @@
 #include "CameraCapture.h"
 
-// 声明外部的平台特定工厂函数
 namespace video_sdk {
 namespace modules {
 extern std::unique_ptr<ICameraCaptureImpl> CreatePlatformCameraImpl();
@@ -35,6 +34,18 @@ void CameraCapture::switchCamera() {
 
 void CameraCapture::setFrameCallback(OnFrameAvailableCallback callback) {
     if (m_impl) m_impl->setFrameCallback(callback);
+}
+
+void CameraCapture::setPreviewSurface(void* nativeWindow) {
+    if (m_impl) m_impl->setPreviewSurface(nativeWindow);
+}
+
+void CameraCapture::startRecording(const std::string& outputPath) {
+    if (m_impl) m_impl->startRecording(outputPath);
+}
+
+void CameraCapture::stopRecording() {
+    if (m_impl) m_impl->stopRecording();
 }
 
 } // namespace modules

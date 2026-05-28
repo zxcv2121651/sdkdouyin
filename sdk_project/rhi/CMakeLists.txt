@@ -1,9 +1,16 @@
-file(GLOB_RECURSE RHI_SRC
-    "interface/*.cpp"
-    "gles/*.cpp"
-    "vulkan/*.cpp"
+add_library(VideoRHI
+    gles/EGLCore.cpp
+    gles/GLESRenderer.cpp
+    gles/EGLWindow.cpp
+    vulkan/VulkanRenderer.cpp
 )
 
-# 强制为所有平台编译 Vulkan 代码验证语法
-add_library(VideoRHI STATIC ${RHI_SRC})
-target_include_directories(VideoRHI PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/interface)
+target_include_directories(VideoRHI PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_CURRENT_SOURCE_DIR}/interface
+)
+
+if(ANDROID)
+    target_link_libraries(VideoRHI PRIVATE EGL GLESv3)
+endif()
