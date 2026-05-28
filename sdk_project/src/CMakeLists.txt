@@ -1,0 +1,13 @@
+add_library(sdk_core core/core.cpp)
+add_library(sdk_rhi rhi/rhi.cpp)
+add_library(sdk_media media/media.cpp)
+add_library(sdk_hal hal/hal.cpp)
+add_library(sdk_modules modules/modules.cpp)
+add_library(sdk_platform platform/platform.cpp)
+
+target_include_directories(sdk_core PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(sdk_rhi PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(sdk_media PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(sdk_hal PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(sdk_modules PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(sdk_platform PUBLIC ${CMAKE_SOURCE_DIR}/include)
