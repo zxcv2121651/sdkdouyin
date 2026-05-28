@@ -44,3 +44,12 @@ target_link_libraries(VideoSDKCore
 if(ANDROID)
     target_link_libraries(VideoSDKCore PRIVATE log android EGL GLESv3)
 endif()
+
+# JNI Bindings Target (for Android)
+if(ANDROID)
+    add_library(VideoSDKJni SHARED
+        platform/android/jni/VideoEditorJni.cpp
+        platform/android/jni/CameraCaptureJni.cpp
+    )
+    target_link_libraries(VideoSDKJni PRIVATE VideoSDKCore log android)
+endif()
