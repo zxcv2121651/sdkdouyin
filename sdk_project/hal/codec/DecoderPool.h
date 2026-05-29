@@ -1,47 +1,47 @@
 #pragma once
 
-#include "../interface/IDecoderPool.h"
 #include <string>
-#include <list>
 #include <unordered_map>
-#include <memory>
+#include <list>
 #include <mutex>
+#include <memory>
+#include "hal/interface/IDecoderPool.h"
 #include "media/codec/SoftwareVideoDecoder.h"
+#include "hal/codec/AndroidMediaCodecDecoder.h"
 
 namespace video_sdk {
 namespace hal {
 
 /**
- * @brief 工业级解码器缓存池 (基于 LRU 策略)。
- * 在复杂的 NLE (非编) 场景中，同一时刻可能需要大量解码器实例。
- * 为防止 OOM (Out Of Memory) 或者超过 Android MediaCodec 硬件实例数限制，
- * 我们通过 LRU (Least Recently Used) 算法严格管控存活的解码器。
+ * @brief 解码器池：实现 LRU (Least Recently Used) 缓存策略。
+ * 解决移动端硬件解码器实例化缓慢及实例数量受限 (如仅支持16个实例) 的问题。
  */
 class DecoderPool : public IDecoderPool {
 public:
-    // 默认最多允许 3 个并发视频解码器存活
-    explicit DecoderPool(size_t maxCapacity = 3);
+    explicit DecoderPool(size_t maxCapacity = 8);
     ~DecoderPool() override;
 
-    // 请求一个解码器（如果池子中存在且可用，则直接返回；否则创建新的；若超容则踢掉最老的）
-    std::shared_ptr<media::SoftwareVideoDecoder> requestDecoderInstance(const std::string& assetPath);
-
     void requestDecoder(const std::string& assetPath) override;
+
+    // 获取或创建软件解码器 (用于演示或兼容路径)
+    std::shared_ptr<media::SoftwareVideoDecoder> requestSoftwareDecoderInstance(const std::string& assetPath);
+
+    // 获取或创建硬件解码器 (零拷贝路径)
+    std::shared_ptr<AndroidMediaCodecDecoder> requestHardwareDecoderInstance(const std::string& assetPath, uint32_t codecId, int width, int height, void* surface);
+
     void releaseDecoder(const std::string& assetPath) override;
 
 private:
-    size_t m_maxCapacity;
-    std::mutex m_mutex;
-
-    // LRU 双向链表，记录最近使用的顺序 (Front 是最新使用的)
-    std::list<std::string> m_lruList;
-
-    // 映射表：assetPath -> (Decoder实例, 链表迭代器)
-    struct PoolItem {
-        std::shared_ptr<media::SoftwareVideoDecoder> decoder;
+    struct CacheEntry {
+        std::shared_ptr<media::SoftwareVideoDecoder> softDecoder;
+        std::shared_ptr<AndroidMediaCodecDecoder> hwDecoder;
         std::list<std::string>::iterator lruIter;
     };
-    std::unordered_map<std::string, PoolItem> m_cache;
+
+    size_t m_maxCapacity;
+    std::mutex m_mutex;
+    std::list<std::string> m_lruList;
+    std::unordered_map<std::string, CacheEntry> m_cache;
 };
 
 } // namespace hal
