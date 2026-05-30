@@ -15,6 +15,9 @@ public:
     VideoPlayer();
     ~VideoPlayer();
 
+    // 绑定 Android Surface / iOS Layer 以供渲染
+    void setWindow(void* window);
+
     // 加载资源并准备播放
     bool prepare(const std::string& sourceUrl);
 
@@ -36,6 +39,7 @@ public:
 private:
     bool m_isPlaying = false;
     int64_t m_currentPositionMs = 0;
+    void* m_window = nullptr;
 };
 
 } // namespace modules

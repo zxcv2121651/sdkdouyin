@@ -1,11 +1,17 @@
 package com.video.sdk
 
+import android.view.Surface
+
 class VideoPlayer {
     private var nativeHandle: Long = 0
 
     init {
         System.loadLibrary("VideoSDKJni")
         nativeHandle = nativeCreate()
+    }
+
+    fun setSurface(surface: Surface?) {
+        nativeSetSurface(nativeHandle, surface)
     }
 
     @Throws(VideoSdkError::class)
@@ -41,6 +47,7 @@ class VideoPlayer {
     }
 
     private external fun nativeCreate(): Long
+    private external fun nativeSetSurface(handle: Long, surface: Surface?)
     private external fun nativePrepare(handle: Long, sourceUrl: String): Boolean
     private external fun nativePlay(handle: Long)
     private external fun nativePause(handle: Long)

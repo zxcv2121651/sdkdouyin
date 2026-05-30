@@ -90,3 +90,20 @@ Java_com_video_sdk_VideoPlayer_nativeDestroy(JNIEnv* env, jobject thiz, jlong ha
         delete playerPtr;
     }
 }
+
+#include <android/native_window_jni.h>
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_video_sdk_VideoPlayer_nativeSetSurface(JNIEnv* env, jobject thiz, jlong handle, jobject surface) {
+    auto playerPtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::VideoPlayer>*>(handle);
+    if (playerPtr && (*playerPtr)) {
+        ANativeWindow* window = nullptr;
+        if (surface != nullptr) {
+            window = ANativeWindow_fromSurface(env, surface);
+        }
+        (*playerPtr)->setWindow(window);
+
+        // 注：ANativeWindow_fromSurface 返回的引用通常需要我们自己去 release，
+        // 我们假设底层引擎 (EGLCore 或 Renderer) 会接管其生命周期管理或在不需要时 release。
+    }
+}

@@ -16,6 +16,10 @@ CameraCapture::CameraCapture() {
 
 CameraCapture::~CameraCapture() = default;
 
+void CameraCapture::setPreviewWindow(void* window) {
+    if (m_impl) m_impl->setPreviewWindow(window);
+}
+
 bool CameraCapture::initialize(int width, int height, int fps) {
     if (m_impl) return m_impl->initialize(width, height, fps);
     return false;

@@ -19,6 +19,9 @@ public:
     CameraCapture();
     ~CameraCapture();
 
+    // 绑定预览的 UI Window (Surface / Layer)
+    void setPreviewWindow(void* window);
+
     // 初始化相机参数
     bool initialize(int width, int height, int fps);
 
@@ -42,6 +45,7 @@ private:
 class ICameraCaptureImpl {
 public:
     virtual ~ICameraCaptureImpl() = default;
+    virtual void setPreviewWindow(void* window) = 0;
     virtual bool initialize(int width, int height, int fps) = 0;
     virtual void startPreview() = 0;
     virtual void stopPreview() = 0;

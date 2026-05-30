@@ -1,11 +1,17 @@
 package com.video.sdk
 
+import android.view.Surface
+
 class CameraCapture {
     private var nativeHandle: Long = 0
 
     init {
         System.loadLibrary("VideoSDKJni")
         nativeHandle = nativeCreate()
+    }
+
+    fun setPreviewSurface(surface: Surface?) {
+        nativeSetPreviewSurface(nativeHandle, surface)
     }
 
     @Throws(VideoSdkError::class)
@@ -33,6 +39,7 @@ class CameraCapture {
     }
 
     private external fun nativeCreate(): Long
+    private external fun nativeSetPreviewSurface(handle: Long, surface: Surface?)
     private external fun nativeInitialize(handle: Long, width: Int, height: Int, fps: Int): Boolean
     private external fun nativeStartPreview(handle: Long)
     private external fun nativeStopPreview(handle: Long)

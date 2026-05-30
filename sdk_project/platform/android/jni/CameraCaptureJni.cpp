@@ -61,3 +61,17 @@ Java_com_video_sdk_CameraCapture_nativeDestroy(JNIEnv* env, jobject thiz, jlong 
         delete capturePtr;
     }
 }
+
+#include <android/native_window_jni.h>
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_video_sdk_CameraCapture_nativeSetPreviewSurface(JNIEnv* env, jobject thiz, jlong handle, jobject surface) {
+    auto capturePtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::CameraCapture>*>(handle);
+    if (capturePtr && (*capturePtr)) {
+        ANativeWindow* window = nullptr;
+        if (surface != nullptr) {
+            window = ANativeWindow_fromSurface(env, surface);
+        }
+        (*capturePtr)->setPreviewWindow(window);
+    }
+}

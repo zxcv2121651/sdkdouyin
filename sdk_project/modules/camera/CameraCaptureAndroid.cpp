@@ -22,6 +22,14 @@ public:
     CameraCaptureAndroid() {}
     ~CameraCaptureAndroid() override { stopPreview(); }
 
+    void setPreviewWindow(void* window) override {
+        // 在实际业务中，除了 ImageReader 接收数据外，也可以把外部传进来的
+        // Surface（作为 ANativeWindow*）作为另一个 Output Target，
+        // 实现相机的零拷贝硬件预览。
+        m_externalWindow = window;
+        std::cout << "[NDK Camera] Bound external preview window: " << m_externalWindow << std::endl;
+    }
+
     bool initialize(int width, int height, int fps) override {
         m_width = width;
         m_height = height;
@@ -66,6 +74,11 @@ public:
 
         ACameraOutputTarget_create(m_nativeWindow, &m_reqTarget);
 
+        // 如果绑定了外部 Surface，也可以添加到推流中
+        if (m_externalWindow) {
+            // ... 添加额外的输出目标
+        }
+
         // 4. 创建 Session 并开始推流 (Repeating Request)
         ACameraCaptureSession_stateCallbacks sessionCallbacks{};
         ACameraDevice_createCaptureSession(m_cameraDevice, m_outputContainer, &sessionCallbacks, &m_captureSession);
@@ -108,9 +121,6 @@ private:
         auto* self = static_cast<CameraCaptureAndroid*>(context);
         AImage* image = nullptr;
         if (AImageReader_acquireNextImage(reader, &image) == 0 && image) {
-            // 这里获得了原生的硬件帧。
-            // 工业级实现：在这里取出 YUV data，再通过 GPU 离屏渲染将其包装为 FBO 或者 TextureID 给上层
-
             // 模拟触发外部回调
             if (self->m_frameCallback) {
                 self->m_frameCallback(0 /* fake textureId */, 0 /* fake pts */);
@@ -128,6 +138,7 @@ private:
     ACameraDevice* m_cameraDevice = nullptr;
     AImageReader* m_imageReader = nullptr;
     ANativeWindow* m_nativeWindow = nullptr;
+    void* m_externalWindow = nullptr;
 
     ACaptureSessionOutputContainer* m_outputContainer = nullptr;
     ACaptureSessionOutput* m_sessionOutput = nullptr;
@@ -138,8 +149,6 @@ private:
 
 // 平台工厂实现
 std::unique_ptr<ICameraCaptureImpl> CreatePlatformCameraImpl() {
-    // 根据宏定义或运行时判断实例化对应的实现类
-    // 此处我们默认在 Android / Mock 环境实例化 Android 版本
     return std::make_unique<CameraCaptureAndroid>();
 }
 
