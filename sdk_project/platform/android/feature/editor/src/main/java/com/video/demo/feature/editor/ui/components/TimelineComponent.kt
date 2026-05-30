@@ -5,75 +5,105 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-
-data class TrackInfo(val trackId: String, val clips: List<ClipUiModel>)
-data class ClipUiModel(val id: String, val durationMs: Long, val color: Color)
+import androidx.compose.ui.unit.sp
 
 @Composable
-fun TimelineComponent(
-    tracks: List<TrackInfo>,
-    currentTimeMs: Long,
-    onSeek: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
+fun TimelineComponent() {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(200.dp)
-            .background(MaterialTheme.colorScheme.surface)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1E1E1E))
     ) {
         val scrollState = rememberScrollState()
 
-        // 轨道区域 (支持横向滑动)
-        Column(
+        // 刻度尺和视频轨道包裹在一个横向滚动的 Row 中
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .horizontalScroll(scrollState)
-                .padding(vertical = 16.dp, horizontal = 50.dp) // 预留吸附中线的空间
+                .padding(top = 16.dp, bottom = 16.dp)
         ) {
-            tracks.forEach { track ->
-                TrackRow(track)
+            // 左侧占位（保证中心线在起播位置）
+            Spacer(modifier = Modifier.width(180.dp))
+
+            Column {
+                // 顶部刻度尺模拟
+                TimeRuler()
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // 视频轨道
+                Row(
+                    modifier = Modifier
+                        .height(60.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF333333)),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 模拟一段视频 Clip
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(300.dp)
+                            .background(Color(0xFF4A4A4A))
+                    ) {
+                        Text(
+                            text = "视频片段 1",
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(2.dp)) // 视频段间距
+
+                    // 模拟第二段视频 Clip
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(200.dp)
+                            .background(Color(0xFF4A4A4A))
+                    ) {
+                        Text(
+                            text = "视频片段 2",
+                            color = Color.White,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                }
             }
+
+            // 右侧占位
+            Spacer(modifier = Modifier.width(180.dp))
         }
 
-        // 吸附中线 (播放指针)
+        // 固定的白色中心播放线 (Playhead)
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .width(2.dp)
                 .fillMaxHeight()
+                .padding(vertical = 4.dp)
                 .background(Color.White)
         )
     }
 }
 
 @Composable
-private fun TrackRow(track: TrackInfo) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(50.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        track.clips.forEach { clip ->
-            // 这里将 durationMs 转换为屏幕 dp 宽度 (比如 1ms = 0.01dp)
-            val widthDp = (clip.durationMs * 0.01f).dp
-            Box(
-                modifier = Modifier
-                    .width(widthDp)
-                    .fillMaxHeight()
-                    .padding(end = 2.dp)
-                    .background(clip.color, RoundedCornerShape(4.dp))
+fun TimeRuler() {
+    Row(modifier = Modifier.width(500.dp)) {
+        for (i in 0..10) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(50.dp)
             ) {
-                // 内部可以渲染缩略图
+                Text(text = "00:0$i", color = Color.Gray, fontSize = 10.sp)
+                Box(modifier = Modifier.height(4.dp).width(1.dp).background(Color.Gray))
             }
         }
     }

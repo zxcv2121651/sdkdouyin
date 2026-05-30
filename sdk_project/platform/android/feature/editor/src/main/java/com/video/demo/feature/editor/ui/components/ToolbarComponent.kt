@@ -1,36 +1,60 @@
 package com.video.demo.feature.editor.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-
-data class ToolbarItem(val title: String, val iconRes: Int = 0, val action: () -> Unit)
+import androidx.compose.ui.unit.sp
 
 @Composable
-fun ToolbarComponent(
-    items: List<ToolbarItem>,
-    modifier: Modifier = Modifier
-) {
-    LazyRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .background(MaterialTheme.colorScheme.background),
+fun ToolbarComponent() {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        items(items) { item ->
-            TextButton(onClick = item.action) {
-                Text(item.title, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
+        ToolButton(text = "剪辑", icon = "✂")
+        ToolButton(text = "音频", icon = "🎵")
+        ToolButton(text = "文本", icon = "T")
+        ToolButton(text = "贴纸", icon = "★")
+        ToolButton(text = "画中画", icon = "◫")
+        ToolButton(text = "特效", icon = "✨")
+        ToolButton(text = "滤镜", icon = "◑")
+        ToolButton(text = "比例", icon = "▤")
+        ToolButton(text = "背景", icon = "□")
+    }
+}
+
+@Composable
+fun ToolButton(text: String, icon: String, onClick: () -> Unit = {}) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        // 使用 Text 暂时代替 Icon 图片
+        Text(
+            text = icon,
+            color = Color.White,
+            fontSize = 20.sp,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 12.sp
+        )
     }
 }

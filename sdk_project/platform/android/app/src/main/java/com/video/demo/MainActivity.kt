@@ -3,18 +3,24 @@ package com.video.demo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.view.WindowCompat
-// import dagger.hilt.android.AndroidEntryPoint
-import com.video.demo.feature.editor.ui.EditorScreenRouter
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import com.video.demo.feature.editor.ui.EditorScreen
 
-// @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
-            // App 壳工程直接路由到 Editor 模块的根节点
-            EditorScreenRouter()
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    EditorScreen()
+                }
+            }
         }
     }
 }
