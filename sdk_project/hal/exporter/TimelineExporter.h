@@ -1,16 +1,18 @@
 #pragma once
 
 #include "../interface/ITimelineExporter.h"
+#include "hal/codec/AndroidMediaCodecEncoder.h"
+#include "core/utils/MessageLoop.h"
 #include <atomic>
-#include <thread>
+#include <memory>
 
 namespace video_sdk {
 namespace hal {
 
 /**
  * @brief TimelineExporter 导出引擎实现。
- * 负责在后台新开线程、构建无头 (Headless) EGL/Metal Context，
- * 并驱动引擎以最大速度渲染每一帧，进而送入硬件编码器中。
+ * 核心升级：废弃暴力 while() 循环，改用 MessageLoop 驱动状态机。
+ * 实现高性能无阻塞导出。
  */
 class TimelineExporter : public ITimelineExporter {
 public:
@@ -22,12 +24,17 @@ public:
     float getProgress() override;
 
 private:
-    void exportLoop();
+    void doExportNextFrame();
+    void finishExport();
 
 private:
-    std::thread m_exportThread;
+    core::MessageLoop m_messageLoop;
     std::atomic<bool> m_isExporting{false};
     std::atomic<float> m_progress{0.0f};
+
+    std::unique_ptr<AndroidMediaCodecEncoder> m_encoder;
+    int m_totalFrames = 300;
+    int m_currentFrame = 0;
 };
 
 } // namespace hal

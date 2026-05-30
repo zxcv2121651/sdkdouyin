@@ -1,6 +1,5 @@
 #include "RenderThreadSyncLoop.h"
 #include <iostream>
-#include <chrono>
 
 namespace video_sdk {
 namespace media {
@@ -14,60 +13,71 @@ RenderThreadSyncLoop::~RenderThreadSyncLoop() {
 }
 
 void RenderThreadSyncLoop::start() {
-    if (m_isRunning) return;
-    m_isRunning = true;
-    m_renderThread = std::thread(&RenderThreadSyncLoop::threadLoop, this);
+    m_messageLoop.start("RenderSyncThread");
 }
 
 void RenderThreadSyncLoop::stop() {
-    if (!m_isRunning) return;
-    m_isRunning = false;
-    if (m_renderThread.joinable()) {
-        m_renderThread.join();
-    }
+    m_messageLoop.stop();
+}
+
+void RenderThreadSyncLoop::postTask(std::function<void()> task) {
+    m_messageLoop.postTask(std::move(task));
 }
 
 bool RenderThreadSyncLoop::enqueueFrame(const VideoFrame& frame) {
-    // 生产者调用：非阻塞
-    return m_frameQueue.push(frame);
+    if (!m_frameQueue.push(frame)) {
+        return false;
+    }
+
+    // 数据进入队列后，抛一个任务去触发调度
+    m_messageLoop.postTask([this]() {
+        this->scheduleNextRender();
+    });
+    return true;
 }
 
-void RenderThreadSyncLoop::threadLoop() {
-    while (m_isRunning) {
-        VideoFrame currentFrame;
+void RenderThreadSyncLoop::scheduleNextRender() {
+    if (!m_messageLoop.isRunning() || m_frameQueue.empty()) return;
 
-        // 消费者调用：非阻塞轮询 (实际中可以通过增加 EventFd 或 条件变量在空时休眠，
-        // 这里为了极致的低延迟，采用类似自旋的机制，每次空闲 yield)
-        if (!m_frameQueue.pop(currentFrame)) {
-            // 队列为空，释放 CPU 时间片
-            std::this_thread::yield();
-            // 如果不想消耗过多 CPU，可以短暂 sleep_for(1ms)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-            continue;
-        }
+    VideoFrame frame;
+    // 取出最老的帧 (但不从队列中删除，直到我们决定渲染或丢弃它)
+    if (!m_frameQueue.peek(frame)) return;
 
-        // --- 核心音视频同步逻辑 (A/V Sync) ---
-        int64_t delayMs = m_masterClock->computeVideoDelay(currentFrame.pts);
+    int64_t audioClockMs = m_masterClock->getClock();
+    int64_t diffMs = frame.pts - audioClockMs;
 
-        if (delayMs > SYNC_THRESHOLD_MAX) {
-            // 视频偏早 (Video is early)
-            std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
-            renderFrame(currentFrame);
-        } else if (delayMs < SYNC_THRESHOLD_MIN) {
-            // 视频滞后 (Video is late) -> 丢弃
-            std::cout << "[LockFree A/V Sync] Video PTS " << currentFrame.pts
-                      << " is late by " << delayMs << "ms. DROPPING!" << std::endl;
-        } else {
-            // 完全同步 (In Sync)
-            std::cout << "[LockFree A/V Sync] Video PTS " << currentFrame.pts
-                      << " is ON TIME. Rendering." << std::endl;
-            renderFrame(currentFrame);
-        }
+    if (diffMs > SYNC_THRESHOLD_MAX) {
+        // 视频帧太早了 (提前量大于10ms)，使用 postDelayedTask 精准延后调度
+        // 取消了原来的 std::this_thread::sleep_for，释放 CPU
+        m_messageLoop.postDelayedTask([this]() {
+            this->scheduleNextRender();
+        }, diffMs);
+    }
+    else if (diffMs < SYNC_THRESHOLD_MIN) {
+        // 视频帧太晚了 (落后超过15ms)，丢帧并立即调度下一帧
+        std::cout << "[LockFree A/V Sync] Video PTS " << frame.pts << " is too LATE (diff " << diffMs << "ms). DROPPING!" << std::endl;
+        m_frameQueue.pop(); // 丢弃当前帧
+
+        m_messageLoop.postTask([this]() {
+            this->scheduleNextRender();
+        });
+    }
+    else {
+        // 在阈值范围内，准时渲染
+        m_frameQueue.pop(); // 真正取出
+        renderFrame(frame);
+
+        // 渲染完后立刻检查是否还有下一帧
+        m_messageLoop.postTask([this]() {
+            this->scheduleNextRender();
+        });
     }
 }
 
 void RenderThreadSyncLoop::renderFrame(const VideoFrame& frame) {
-    // 调用 RHI 渲染引擎进行上屏
+    // 工业级实现：在这里取出 YUV data 或 TextureID，送入 RenderGraph 进行链式处理和特效绘制
+    // RenderGraph->render(frame);
+    std::cout << "[LockFree A/V Sync] Video PTS " << frame.pts << " is ON TIME. Rendering." << std::endl;
 }
 
 } // namespace media

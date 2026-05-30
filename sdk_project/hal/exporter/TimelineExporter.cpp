@@ -1,7 +1,5 @@
 #include "TimelineExporter.h"
-#include "hal/codec/AndroidMediaCodecEncoder.h"
 #include <iostream>
-#include <chrono>
 
 namespace video_sdk {
 namespace hal {
@@ -17,78 +15,82 @@ void TimelineExporter::startExport() {
 
     m_isExporting = true;
     m_progress = 0.0f;
-    m_exportThread = std::thread(&TimelineExporter::exportLoop, this);
+    m_currentFrame = 0;
+    m_totalFrames = 300; // 假设导出10秒30帧
+
+    m_messageLoop.start("ExportThread");
+
+    // 抛出初始化任务到后台线程
+    m_messageLoop.postTask([this]() {
+        std::cout << "[TimelineExporter] Starting offline export on MessageLoop..." << std::endl;
+
+        m_encoder = std::make_unique<AndroidMediaCodecEncoder>();
+        if (!m_encoder->initialize(173, 1080, 1920, 5000000, 30)) {
+            std::cerr << "[TimelineExporter] Failed to init hardware encoder!" << std::endl;
+            m_isExporting = false;
+            return;
+        }
+
+        std::cout << "[TimelineExporter] Got InputSurface: " << m_encoder->getInputSurface() << std::endl;
+
+        // 启动第一帧渲染
+        this->doExportNextFrame();
+    });
 }
 
 void TimelineExporter::cancelExport() {
     if (!m_isExporting) return;
-    m_isExporting = false;
-    if (m_exportThread.joinable()) {
-        m_exportThread.join();
-    }
+
+    // 发送取消指令到队列
+    m_messageLoop.postTask([this]() {
+        if (m_isExporting) {
+            std::cout << "[TimelineExporter] Export CANCELED!" << std::endl;
+            this->finishExport();
+        }
+    });
+
+    m_messageLoop.stop();
 }
 
 float TimelineExporter::getProgress() {
     return m_progress.load();
 }
 
-void TimelineExporter::exportLoop() {
-    std::cout << "[TimelineExporter] Starting offline export..." << std::endl;
+void TimelineExporter::doExportNextFrame() {
+    if (!m_isExporting) return;
 
-    // 1. 初始化独立的后台 EGLCore 或 Metal Context (此处省略)
-    // ...
-
-    // 2. 初始化硬件编码器 (零拷贝模式)
-    AndroidMediaCodecEncoder encoder;
-    // 使用 HEVC (H.265), 1080p, 5Mbps, 30fps
-    if (!encoder.initialize(173, 1080, 1920, 5000000, 30)) {
-        std::cerr << "[TimelineExporter] Failed to initialize hardware encoder!" << std::endl;
-        m_isExporting = false;
+    if (m_currentFrame >= m_totalFrames) {
+        std::cout << "[TimelineExporter] Export completed 100%!" << std::endl;
+        m_progress = 1.0f;
+        finishExport();
         return;
     }
 
-    // 获取编码器表面，渲染引擎直接向其绘制
-    void* inputSurface = encoder.getInputSurface();
-    std::cout << "[TimelineExporter] Got InputSurface: " << inputSurface << std::endl;
+    // 1. 模拟执行 RenderGraph (伪代码: graph->render())
+    // 2. 模拟从 GPU 获取编码缓冲
+    m_encoder->drainOutput();
 
-    // 3. 极速渲染循环 (不再受 AVSyncClock 的真实时间限制)
-    int totalFrames = 300; // 假设要导出 10 秒 30fps 的视频
-    int currentFrame = 0;
+    m_currentFrame++;
+    m_progress = static_cast<float>(m_currentFrame) / m_totalFrames;
 
-    while (m_isExporting && currentFrame < totalFrames) {
-
-        // 渲染管线执行 (伪代码)
-        // eglMakeCurrent(display, inputSurface, inputSurface, context);
-        // graph->render();
-        // eglSwapBuffers(display, inputSurface);
-
-        // 提交编码器排空
-        encoder.drainOutput();
-
-        // 模拟极速导出耗时 (硬件渲染通常每帧只需 3~5ms)
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
-        currentFrame++;
-        m_progress = static_cast<float>(currentFrame) / totalFrames;
-
-        if (currentFrame % 50 == 0) {
-            std::cout << "[TimelineExporter] Progress: " << (m_progress * 100.0f) << "%" << std::endl;
-        }
+    if (m_currentFrame % 50 == 0) {
+        std::cout << "[TimelineExporter] Progress: " << (m_progress * 100.0f) << "%" << std::endl;
     }
 
-    // 刷新剩余的编码缓冲
-    encoder.drainOutput();
-    encoder.destroy();
+    // 利用 MessageLoop 模拟硬件渲染的时间，不阻塞 CPU
+    // 实际工业级代码中：这里应该是等待 EGL/Vulkan 的 Fence/Sync 回调后再调度下一帧
+    m_messageLoop.postDelayedTask([this]() {
+        this->doExportNextFrame();
+    }, 5); // 模拟5ms耗时
+}
 
-    if (m_isExporting) {
-        std::cout << "[TimelineExporter] Export completed 100%!" << std::endl;
-        m_progress = 1.0f;
-        m_isExporting = false;
-    } else {
-        std::cout << "[TimelineExporter] Export CANCELED!" << std::endl;
+void TimelineExporter::finishExport() {
+    if (m_encoder) {
+        m_encoder->drainOutput(); // 冲刷剩余数据
+        m_encoder->destroy();
+        m_encoder.reset();
     }
-
-    // 4. 清理 Context (此处省略)
+    m_isExporting = false;
 }
 
 } // namespace hal
