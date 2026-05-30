@@ -36,3 +36,6 @@ inline void glLinkProgram(uint32_t program) {}
 inline void glDeleteShader(uint32_t shader) {}
 inline void glDispatchCompute(uint32_t num_groups_x, uint32_t num_groups_y, uint32_t num_groups_z) {}
 inline void glBindImageTexture(uint32_t unit, uint32_t texture, int level, bool layered, int layer, uint32_t access, uint32_t format) {}
+
+#define GL_MAX_TEXTURE_SIZE 0x0D33
+inline void glGetIntegerv(unsigned int pname, int* params) { *params = 2048; }

@@ -57,7 +57,6 @@ bool EGLCore::initEGL(EGLContext sharedContext, int flags) {
         EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, 16,
         EGL_RENDERABLE_TYPE, renderableType,
-        // 这里可以配置 EGL_RECORDABLE_ANDROID 用于硬编兼容
         EGL_NONE
     };
 
@@ -69,6 +68,9 @@ bool EGLCore::initEGL(EGLContext sharedContext, int flags) {
 
     // 2. 创建上下文，最关键的一步是传入 sharedContext
     // 工业级 SDK 中的多线程渲染(UI、采集、编码、解码)必须依赖这个 share 机制
+
+    // GLES 的 EGL API 中只能请求到大版本 3，具体得到的是 3.0, 3.1 还是 3.2
+    // 由驱动决定，并可以通过 glGetString(GL_VERSION) 解析。
     int contextAttribs[] = {
         EGL_CONTEXT_CLIENT_VERSION, 3, // 强行要求 GLES 3
         EGL_NONE
@@ -78,8 +80,11 @@ bool EGLCore::initEGL(EGLContext sharedContext, int flags) {
     m_eglContext = eglCreateContext(m_eglDisplay, m_eglConfig, sharedContext, contextAttribs);
     if (eglGetError() != 0x3000 /*EGL_SUCCESS*/ || m_eglContext == EGL_NO_CONTEXT) {
         // Fallback 到 GLES 2
+        std::cout << "[EGLCore] Fallback to GLES 2 context." << std::endl;
         contextAttribs[1] = 2;
         m_eglContext = eglCreateContext(m_eglDisplay, m_eglConfig, sharedContext, contextAttribs);
+    } else {
+        std::cout << "[EGLCore] GLES 3+ context created." << std::endl;
     }
 
     if (m_eglContext == EGL_NO_CONTEXT) {

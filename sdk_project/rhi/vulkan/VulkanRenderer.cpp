@@ -11,6 +11,11 @@ VulkanRenderer::~VulkanRenderer() {
 
 void VulkanRenderer::initialize() {
     initVulkanCore();
+
+    // Vulkan natively supports Compute Shaders
+    m_caps.supportsComputeShader = true;
+    m_caps.supportsImageLoadStore = true;
+    m_caps.maxTextureSize = 4096;
 }
 
 void VulkanRenderer::initVulkanCore() {

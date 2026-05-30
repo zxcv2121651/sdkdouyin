@@ -5,6 +5,14 @@
 namespace video_sdk {
 namespace rhi {
 
+// RHI 硬件特性查询结构体
+struct RendererCapabilities {
+    bool supportsComputeShader = false;
+    bool supportsImageLoadStore = false;
+    bool supportsPixelBufferObject = false;
+    int maxTextureSize = 2048;
+};
+
 // FBO 包含的纹理和帧缓冲对象 ID
 struct FrameBufferObject {
     uint32_t fboId;
@@ -24,6 +32,9 @@ public:
     virtual void initialize() = 0;
     virtual void destroy() = 0;
 
+    // 查询硬件支持能力
+    virtual const RendererCapabilities& getCapabilities() const = 0;
+
     // FBO (帧缓冲对象) 管理
     virtual FrameBufferObject* acquireFBO(int width, int height) = 0;
     virtual void releaseFBO(FrameBufferObject* fbo) = 0;
@@ -31,7 +42,7 @@ public:
     // Shader (着色器) 管理
     virtual uint32_t compileShader(const std::string& vertexSource, const std::string& fragmentSource) = 0;
 
-    // 计算着色器 (Compute Shader) 支持 (GLES 3.1+)
+    // 计算着色器 (Compute Shader) 支持 (GLES 3.1+ / Vulkan)
     virtual uint32_t compileComputeShader(const std::string& computeSource) = 0;
     virtual void dispatchCompute(uint32_t programId, int numGroupsX, int numGroupsY, int numGroupsZ) = 0;
 };

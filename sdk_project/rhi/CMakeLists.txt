@@ -1,4 +1,5 @@
 file(GLOB_RECURSE RHI_SRC
+    "*.cpp"
     "interface/*.cpp"
     "gles/*.cpp"
     "vulkan/*.cpp"
