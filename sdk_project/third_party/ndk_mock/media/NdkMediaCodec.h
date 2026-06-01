@@ -45,3 +45,5 @@ inline media_status_t AMediaCodec_createInputSurface(AMediaCodec* codec, void** 
 #endif
 
 inline uint8_t* AMediaCodec_getOutputBuffer(AMediaCodec* codec, size_t idx, size_t* out_size) { if(out_size) *out_size = 1024; static uint8_t buf[1024]; return buf; }
+
+inline AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec* codec) { return (AMediaFormat*)1; }

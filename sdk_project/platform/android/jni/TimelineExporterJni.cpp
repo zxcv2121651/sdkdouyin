@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <memory>
+#include <string>
 #include "JniExceptionHandler.h"
 #include "hal/exporter/TimelineExporter.h"
 
@@ -15,11 +16,22 @@ Java_com_video_sdk_TimelineExporter_nativeCreate(JNIEnv* env, jobject thiz) {
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_video_sdk_TimelineExporter_nativeStartExport(JNIEnv* env, jobject thiz, jlong handle) {
+Java_com_video_sdk_TimelineExporter_nativeStartExport(JNIEnv* env, jobject thiz, jlong handle, jstring outputPath) {
     auto exporterPtr = reinterpret_cast<std::shared_ptr<video_sdk::hal::TimelineExporter>*>(handle);
-    if (exporterPtr && (*exporterPtr)) {
-        (*exporterPtr)->startExport();
+    if (!exporterPtr || !(*exporterPtr)) {
+        return;
     }
+
+    std::string pathStr = "";
+    if (outputPath != nullptr) {
+        const char* pathChars = env->GetStringUTFChars(outputPath, nullptr);
+        if (pathChars) {
+            pathStr = std::string(pathChars);
+            env->ReleaseStringUTFChars(outputPath, pathChars);
+        }
+    }
+
+    (*exporterPtr)->startExport(pathStr);
 }
 
 extern "C" JNIEXPORT void JNICALL

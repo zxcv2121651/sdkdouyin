@@ -5,6 +5,7 @@
 #include "core/utils/MessageLoop.h"
 #include <atomic>
 #include <memory>
+#include <string>
 
 namespace video_sdk {
 namespace hal {
@@ -12,14 +13,14 @@ namespace hal {
 /**
  * @brief TimelineExporter 导出引擎实现。
  * 核心升级：废弃暴力 while() 循环，改用 MessageLoop 驱动状态机。
- * 实现高性能无阻塞导出。
+ * 实现高性能无阻塞导出，最终压制成 MP4。
  */
 class TimelineExporter : public ITimelineExporter {
 public:
     TimelineExporter();
     ~TimelineExporter() override;
 
-    void startExport() override;
+    void startExport(const std::string& outputPath = "") override;
     void cancelExport() override;
     float getProgress() override;
 

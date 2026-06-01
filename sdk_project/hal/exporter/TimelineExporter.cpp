@@ -10,8 +10,10 @@ TimelineExporter::~TimelineExporter() {
     cancelExport();
 }
 
-void TimelineExporter::startExport() {
+void TimelineExporter::startExport(const std::string& outputPath) {
     if (m_isExporting) return;
+
+    std::string finalPath = outputPath.empty() ? "/sdcard/output.mp4" : outputPath;
 
     m_isExporting = true;
     m_progress = 0.0f;
@@ -21,11 +23,12 @@ void TimelineExporter::startExport() {
     m_messageLoop.start("ExportThread");
 
     // 抛出初始化任务到后台线程
-    m_messageLoop.postTask([this]() {
+    m_messageLoop.postTask([this, finalPath]() {
         std::cout << "[TimelineExporter] Starting offline export on MessageLoop..." << std::endl;
 
         m_encoder = std::make_unique<AndroidMediaCodecEncoder>();
-        if (!m_encoder->initialize(173, 1080, 1920, 5000000, 30)) {
+        // 使用 HEVC (H.265), 1080p, 5Mbps, 30fps
+        if (!m_encoder->initialize(173, 1080, 1920, 5000000, 30, finalPath)) {
             std::cerr << "[TimelineExporter] Failed to init hardware encoder!" << std::endl;
             m_isExporting = false;
             return;
@@ -62,13 +65,15 @@ void TimelineExporter::doExportNextFrame() {
     if (m_currentFrame >= m_totalFrames) {
         std::cout << "[TimelineExporter] Export completed 100%!" << std::endl;
         m_progress = 1.0f;
+        // 传入 true 表示 EOS，触发 Muxer 封包结束
+        if (m_encoder) m_encoder->drainOutput(true);
         finishExport();
         return;
     }
 
     // 1. 模拟执行 RenderGraph (伪代码: graph->render())
-    // 2. 模拟从 GPU 获取编码缓冲
-    m_encoder->drainOutput();
+    // 2. 排空上一帧的编码缓冲并写入 MP4
+    m_encoder->drainOutput(false);
 
     m_currentFrame++;
     m_progress = static_cast<float>(m_currentFrame) / m_totalFrames;
@@ -78,7 +83,6 @@ void TimelineExporter::doExportNextFrame() {
     }
 
     // 利用 MessageLoop 模拟硬件渲染的时间，不阻塞 CPU
-    // 实际工业级代码中：这里应该是等待 EGL/Vulkan 的 Fence/Sync 回调后再调度下一帧
     m_messageLoop.postDelayedTask([this]() {
         this->doExportNextFrame();
     }, 5); // 模拟5ms耗时
@@ -86,7 +90,6 @@ void TimelineExporter::doExportNextFrame() {
 
 void TimelineExporter::finishExport() {
     if (m_encoder) {
-        m_encoder->drainOutput(); // 冲刷剩余数据
         m_encoder->destroy();
         m_encoder.reset();
     }

@@ -1,5 +1,7 @@
 #include "AndroidMediaCodecEncoder.h"
 #include <iostream>
+#include <fcntl.h>
+#include <unistd.h>
 
 #ifdef ANDROID
 #include <android/native_window.h>
@@ -14,7 +16,7 @@ AndroidMediaCodecEncoder::~AndroidMediaCodecEncoder() {
     destroy();
 }
 
-bool AndroidMediaCodecEncoder::initialize(uint32_t codecId, int width, int height, int bitrate, int fps) {
+bool AndroidMediaCodecEncoder::initialize(uint32_t codecId, int width, int height, int bitrate, int fps, const std::string& outputPath) {
     if (m_isInitialized) return true;
 
 #ifdef ANDROID
@@ -28,7 +30,7 @@ bool AndroidMediaCodecEncoder::initialize(uint32_t codecId, int width, int heigh
         return false;
     }
 
-    std::cout << "[MediaCodec Encoder] Initializing encoder for " << mime << std::endl;
+    std::cout << "[MediaCodec Encoder] Initializing encoder for " << mime << " to " << outputPath << std::endl;
 
     m_codec = AMediaCodec_createEncoderByType(mime);
     if (!m_codec) {
@@ -53,10 +55,23 @@ bool AndroidMediaCodecEncoder::initialize(uint32_t codecId, int width, int heigh
         return false;
     }
 
-    // 创建 InputSurface (Zero-Copy 的核心)
+    // 创建 InputSurface
     status = AMediaCodec_createInputSurface(m_codec, (ANativeWindow**)&m_inputSurface);
     if (status != AMEDIA_OK || !m_inputSurface) {
         std::cerr << "[MediaCodec Encoder] Failed to create input surface" << std::endl;
+        return false;
+    }
+
+    // 初始化 Muxer
+    m_fd = open(outputPath.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    if (m_fd < 0) {
+        std::cerr << "[MediaCodec Encoder] Failed to open output file: " << outputPath << std::endl;
+        return false;
+    }
+
+    m_muxer = AMediaMuxer_new(m_fd, AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4);
+    if (!m_muxer) {
+        std::cerr << "[MediaCodec Encoder] Failed to create muxer" << std::endl;
         return false;
     }
 
@@ -69,29 +84,55 @@ bool AndroidMediaCodecEncoder::initialize(uint32_t codecId, int width, int heigh
     m_isInitialized = true;
     return true;
 #else
-    std::cout << "[MediaCodec Encoder Mock] Initialized hardware encoder on mock platform." << std::endl;
+    std::cout << "[MediaCodec Encoder Mock] Initialized hardware encoder and muxer on mock platform. Path: " << outputPath << std::endl;
     m_isInitialized = true;
     return true;
 #endif
 }
 
-void AndroidMediaCodecEncoder::drainOutput() {
+void AndroidMediaCodecEncoder::drainOutput(bool endOfStream) {
     if (!m_isInitialized) return;
 
 #ifdef ANDROID
+    if (endOfStream) {
+        // 在实际应用中如果能向 InputSurface 发出 EOS 信号最好
+        // eglPresentationTimeANDROID 可以用来发时间戳
+    }
+
     AMediaCodecBufferInfo info;
     while (true) {
         ssize_t status = AMediaCodec_dequeueOutputBuffer(m_codec, &info, 0); // Non-blocking
         if (status == AMEDIACODEC_INFO_TRY_AGAIN_LATER) {
             break; // 没有数据可读了
+        } else if (status == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
+            if (m_muxerStarted) {
+                std::cerr << "[MediaCodec Encoder] format changed twice" << std::endl;
+            } else {
+                AMediaFormat* newFormat = AMediaCodec_getOutputFormat(m_codec);
+                m_videoTrackIndex = AMediaMuxer_addTrack(m_muxer, newFormat);
+                AMediaMuxer_start(m_muxer);
+                m_muxerStarted = true;
+                AMediaFormat_delete(newFormat);
+                std::cout << "[MediaCodec Encoder] Muxer started" << std::endl;
+            }
         } else if (status >= 0) {
             size_t bufSize;
             uint8_t* buf = AMediaCodec_getOutputBuffer(m_codec, status, &bufSize);
-            if (buf && info.size > 0) {
-                // 工业级：在这里将 buf 写入到 MP4 Muxer 中 (如 FFmpeg av_interleaved_write_frame 或 AMediaMuxer)
-                // std::cout << "Encoded frame size: " << info.size << std::endl;
+
+            if ((info.flags & 2) != 0) { // BUFFER_FLAG_CODEC_CONFIG = 2
+                info.size = 0;
             }
-            AMediaCodec_releaseOutputBuffer(m_codec, status, false); // false = 不需要 render
+
+            if (buf && info.size > 0 && m_muxerStarted) {
+                // 将编码好的 H264/H265 NALU 写入 MP4 容器
+                AMediaMuxer_writeSampleData(m_muxer, m_videoTrackIndex, buf, &info);
+            }
+
+            AMediaCodec_releaseOutputBuffer(m_codec, status, false);
+
+            if ((info.flags & 4) != 0) { // BUFFER_FLAG_END_OF_STREAM = 4
+                break;
+            }
         }
     }
 #endif
@@ -104,12 +145,23 @@ void AndroidMediaCodecEncoder::destroy() {
         AMediaCodec_delete(m_codec);
         m_codec = nullptr;
     }
+    if (m_muxer) {
+        if (m_muxerStarted) {
+            AMediaMuxer_stop(m_muxer);
+        }
+        AMediaMuxer_delete(m_muxer);
+        m_muxer = nullptr;
+    }
+    if (m_fd >= 0) {
+        close(m_fd);
+        m_fd = -1;
+    }
     if (m_format) {
         AMediaFormat_delete(m_format);
         m_format = nullptr;
     }
-    // m_inputSurface 的生命周期由系统或特定的 API 管理，如果在 Java 层创建则回传 release
     m_inputSurface = nullptr;
+    m_muxerStarted = false;
 #endif
     m_isInitialized = false;
 }
