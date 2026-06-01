@@ -19,7 +19,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun EditorScreen(onBack: () -> Unit) {
+fun EditorScreen(
+    onBack: () -> Unit,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
+) {
     val videoPlayer = remember { VideoPlayer() }
     val exporter = remember { TimelineExporter() }
 
@@ -28,16 +32,17 @@ fun EditorScreen(onBack: () -> Unit) {
     var exportProgress by remember { mutableStateOf(0f) }
     val coroutineScope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 顶部栏
             TopActionBar(
                 onClose = onBack,
+                isDarkTheme = isDarkTheme,
+                onThemeToggle = onThemeToggle,
                 onExport = {
                     isExporting = true
                     exporter.startExport("/sdcard/Download/output.mp4")
 
-                    // 轮询进度
                     coroutineScope.launch {
                         while (isExporting) {
                             exportProgress = exporter.getProgress()
@@ -51,8 +56,8 @@ fun EditorScreen(onBack: () -> Unit) {
                 }
             )
 
-            // 视频预览区域
-            Box(modifier = Modifier.fillMaxWidth().weight(0.4f).background(Color.DarkGray)) {
+            // 视频预览区域 (预览区始终保持较深的颜色比较好)
+            Box(modifier = Modifier.fillMaxWidth().weight(0.4f).background(Color(0xFF222222))) {
                 VideoPlayerComponent(videoPlayer = videoPlayer)
             }
 
@@ -60,11 +65,7 @@ fun EditorScreen(onBack: () -> Unit) {
             MiddleControlBar(
                 isPlaying = isPlaying,
                 onPlayPauseToggle = {
-                    if (isPlaying) {
-                        videoPlayer.pause()
-                    } else {
-                        videoPlayer.play()
-                    }
+                    if (isPlaying) videoPlayer.pause() else videoPlayer.play()
                     isPlaying = !isPlaying
                 }
             )
@@ -80,7 +81,6 @@ fun EditorScreen(onBack: () -> Unit) {
             }
         }
 
-        // 导出进度遮罩层
         if (isExporting) {
             ExportingOverlay(
                 progress = exportProgress,
@@ -94,24 +94,37 @@ fun EditorScreen(onBack: () -> Unit) {
 }
 
 @Composable
-fun TopActionBar(onClose: () -> Unit, onExport: () -> Unit) {
+fun TopActionBar(
+    onClose: () -> Unit,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit,
+    onExport: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "✖", color = Color.White, modifier = Modifier.clickable { onClose() }.padding(8.dp))
+        Text(text = "✖", color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.clickable { onClose() }.padding(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "1080P", color = Color.White, modifier = Modifier.padding(end = 16.dp))
+            // 主题切换按钮
+            Text(
+                text = if (isDarkTheme) "🌞" else "🌙",
+                modifier = Modifier.clickable { onThemeToggle() }.padding(end = 24.dp),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+
+            Text(text = "1080P", color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(end = 16.dp))
             Button(
                 onClick = onExport,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFE2C55)),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                Text(text = "导出", color = Color.White)
+                Text(text = "导出", color = Color.White) // 导出文字始终是白色
             }
         }
     }
@@ -122,21 +135,22 @@ fun MiddleControlBar(isPlaying: Boolean, onPlayPauseToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "00:00", color = Color.White)
+        Text(text = "00:00", color = MaterialTheme.colorScheme.onBackground)
 
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "↩", color = Color.White) // Undo
+            Text(text = "↩", color = MaterialTheme.colorScheme.onBackground)
             Text(
                 text = if (isPlaying) "⏸" else "▶",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.clickable { onPlayPauseToggle() }
             )
-            Text(text = "↪", color = Color.Gray)  // Redo
+            Text(text = "↪", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -153,7 +167,7 @@ fun ExportingOverlay(progress: Float, onCancel: () -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(
                     progress = progress,
-                    color = Color(0xFFFE2C55),
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(60.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))

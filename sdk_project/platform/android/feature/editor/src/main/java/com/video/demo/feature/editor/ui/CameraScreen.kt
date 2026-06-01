@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +25,11 @@ import androidx.core.content.ContextCompat
 import com.video.sdk.CameraCapture
 
 @Composable
-fun CameraScreen(onNavigateToEditor: () -> Unit) {
+fun CameraScreen(
+    onNavigateToEditor: () -> Unit,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
+) {
     val context = LocalContext.current
     var hasPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -42,16 +47,20 @@ fun CameraScreen(onNavigateToEditor: () -> Unit) {
     }
 
     if (hasPermission) {
-        CameraPreviewContent(onNavigateToEditor)
+        CameraPreviewContent(onNavigateToEditor, isDarkTheme, onThemeToggle)
     } else {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("需要相机权限才能拍摄", color = Color.White)
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            Text("需要相机权限才能拍摄", color = MaterialTheme.colorScheme.onBackground)
         }
     }
 }
 
 @Composable
-fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
+fun CameraPreviewContent(
+    onNavigateToEditor: () -> Unit,
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
+) {
     val cameraCapture = remember { CameraCapture() }
 
     DisposableEffect(Unit) {
@@ -72,9 +81,7 @@ fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
                                 cameraCapture.startPreview()
                             }
                         }
-
                         override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
-
                         override fun surfaceDestroyed(holder: SurfaceHolder) {
                             cameraCapture.stopPreview()
                             cameraCapture.setPreviewSurface(null)
@@ -85,6 +92,19 @@ fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
             modifier = Modifier.fillMaxSize()
         )
 
+        // 顶部主题切换
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Text(
+                text = if (isDarkTheme) "🌞" else "🌙",
+                color = Color.White,
+                fontSize = 24.sp,
+                modifier = Modifier.clickable { onThemeToggle() }
+            )
+        }
+
         // 底部控制区
         Row(
             modifier = Modifier
@@ -94,7 +114,6 @@ fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 切换摄像头
             Text(
                 text = "🔄",
                 color = Color.White,
@@ -102,7 +121,6 @@ fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
                 modifier = Modifier.clickable { cameraCapture.switchCamera() }
             )
 
-            // 拍摄/录制大圆钮 (模拟点击进入下一步)
             Box(
                 modifier = Modifier
                     .size(80.dp)
@@ -115,11 +133,10 @@ fun CameraPreviewContent(onNavigateToEditor: () -> Unit) {
                     modifier = Modifier
                         .size(60.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFFE2C55))
+                        .background(MaterialTheme.colorScheme.primary)
                 )
             }
 
-            // 完成按钮
             Text(
                 text = "✓",
                 color = Color.White,
