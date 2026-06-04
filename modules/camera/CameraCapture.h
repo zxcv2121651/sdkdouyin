@@ -6,13 +6,14 @@
 namespace video_sdk {
 namespace modules {
 
-using OnFrameAvailableCallback = std::function<void(uint32_t textureId, int64_t timestampMs)>;
+using OnFrameAvailableCallback = std::function<void(uint32_t textureId, int width, int height, int64_t timestampMs, const float* transformMatrix)>;
 
 class ICameraCaptureImpl; // 隐藏平台特定实现
 
 /**
- * @brief 极速录制采集模块 (基于 PIMPL 模式设计)。
- * 隐藏底层复杂的 NDK Camera2 / iOS AVFoundation 逻辑，保证业务层头文件纯净。
+ * @brief 摄像头采集模块 (基于 PIMPL 模式设计)。
+ * 采用工业级 "Kotlin 采集 + OES 纹理透传 C++" 架构。
+ * 允许 Android/iOS 在系统层完成高兼容性的相机控制，然后将画面纹理传给 C++ 进行极速渲染。
  */
 class CameraCapture {
 public:
@@ -22,19 +23,10 @@ public:
     // 绑定预览的 UI Window (Surface / Layer)
     void setPreviewWindow(void* window);
 
-    // 初始化相机参数
-    bool initialize(int width, int height, int fps);
+    // Kotlin/Swift 层接收到相机画面后，将 OES Texture ID 和矩阵传给 C++
+    void pushOESTexture(uint32_t textureId, int width, int height, int64_t timestampMs, const float* transformMatrix);
 
-    // 开始采集与预览
-    void startPreview();
-
-    // 停止采集
-    void stopPreview();
-
-    // 切换前后摄像头
-    void switchCamera();
-
-    // 设置帧回调
+    // 设置帧回调，把 OES 纹理传给下层的 RenderGraph
     void setFrameCallback(OnFrameAvailableCallback callback);
 
 private:
@@ -46,10 +38,7 @@ class ICameraCaptureImpl {
 public:
     virtual ~ICameraCaptureImpl() = default;
     virtual void setPreviewWindow(void* window) = 0;
-    virtual bool initialize(int width, int height, int fps) = 0;
-    virtual void startPreview() = 0;
-    virtual void stopPreview() = 0;
-    virtual void switchCamera() = 0;
+    virtual void pushOESTexture(uint32_t textureId, int width, int height, int64_t timestampMs, const float* transformMatrix) = 0;
     virtual void setFrameCallback(OnFrameAvailableCallback callback) = 0;
 };
 

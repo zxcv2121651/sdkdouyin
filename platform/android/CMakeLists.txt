@@ -1,25 +1,28 @@
-# 独立为 Android JNI 编译时的 CMake 逻辑
 cmake_minimum_required(VERSION 3.10.2)
-project(VideoSDKAndroid CXX)
+project(VideoSDKJni VERSION 1.0.0 LANGUAGES CXX)
 
-add_library(VideoSDKJni SHARED
-    "jni/VideoEditorJni.cpp"
-    "jni/CameraCaptureJni.cpp"
-    "jni/VideoPlayerJni.cpp"
-    "jni/TimelineExporterJni.cpp"
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Add mock headers for testing
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ndk_mock
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/vulkan_mock
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../
 )
 
-find_package(JNI)
-if (JNI_FOUND)
-    message(STATUS "JNI found.")
-    target_include_directories(VideoSDKJni PRIVATE ${JNI_INCLUDE_DIRS})
-endif()
+add_library(VideoSDKJni SHARED
+    jni/VideoPlayerJni.cpp
+    jni/TimelineExporterJni.cpp
+    jni/CameraCaptureJni.cpp
+)
 
-target_include_directories(VideoSDKJni PRIVATE
-    ${CMAKE_SOURCE_DIR}/../../
-    ${CMAKE_SOURCE_DIR}/../../third_party/ndk_mock
+target_link_libraries(VideoSDKJni
+    PRIVATE
+    VideoSDKCore
 )
 
 if(ANDROID)
-    target_link_libraries(VideoSDKJni PRIVATE android log)
+    target_link_libraries(VideoSDKJni PRIVATE log android EGL GLESv3)
 endif()

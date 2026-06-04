@@ -20,21 +20,8 @@ void CameraCapture::setPreviewWindow(void* window) {
     if (m_impl) m_impl->setPreviewWindow(window);
 }
 
-bool CameraCapture::initialize(int width, int height, int fps) {
-    if (m_impl) return m_impl->initialize(width, height, fps);
-    return false;
-}
-
-void CameraCapture::startPreview() {
-    if (m_impl) m_impl->startPreview();
-}
-
-void CameraCapture::stopPreview() {
-    if (m_impl) m_impl->stopPreview();
-}
-
-void CameraCapture::switchCamera() {
-    if (m_impl) m_impl->switchCamera();
+void CameraCapture::pushOESTexture(uint32_t textureId, int width, int height, int64_t timestampMs, const float* transformMatrix) {
+    if (m_impl) m_impl->pushOESTexture(textureId, width, height, timestampMs, transformMatrix);
 }
 
 void CameraCapture::setFrameCallback(OnFrameAvailableCallback callback) {

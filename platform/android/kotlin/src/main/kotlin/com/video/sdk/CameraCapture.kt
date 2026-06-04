@@ -4,8 +4,8 @@ import android.view.Surface
 
 /**
  * 摄像头采集核心 SDK 门面类。
- * 封装了底层 C++ 对 Android NDK Camera2 API 的直接调用。
- * 支持极速拉起摄像头并将画面通过硬件直通 (Zero-Copy) 方式送入 GPU 渲染管线。
+ * 现已重构为“Kotlin 层采集 + C++ 层渲染”的混合架构。
+ * 负责在 Java/Kotlin 层接收系统相机的 OES 纹理，并将其透传给 C++ 引擎。
  */
 class CameraCapture {
     private var nativeHandle: Long = 0
@@ -16,52 +16,30 @@ class CameraCapture {
     }
 
     /**
-     * 设置用于实时预览的屏幕画板。
-     * 底层获取到 Android Surface 后，会将其直接挂载为 NDK Camera 的输出目标之一。
-     *
-     * @param surface Android 原生 Surface 对象
+     * 将 Android 层产生的 OES 纹理 ID 推送给 C++ 渲染管线
+     * @param textureId OpenGL OES 纹理 ID
+     * @param width 画面宽度
+     * @param height 画面高度
+     * @param timestampNs 纹理产生的时间戳（纳秒）
+     * @param transformMatrix SurfaceTexture 的 4x4 变换矩阵 (长度16的浮点数组)
+     */
+    fun pushOESTexture(textureId: Int, width: Int, height: Int, timestampNs: Long, transformMatrix: FloatArray?) {
+        if (nativeHandle != 0L) {
+            nativePushOESTexture(nativeHandle, textureId, width, height, timestampNs, transformMatrix)
+        }
+    }
+
+    /**
+     * [保留给历史/预览接口] 设置直接在 C++ 层进行预览的 Surface。
      */
     fun setPreviewSurface(surface: Surface?) {
-        nativeSetPreviewSurface(nativeHandle, surface)
+        if (nativeHandle != 0L) {
+            nativeSetPreviewSurface(nativeHandle, surface)
+        }
     }
 
     /**
-     * 初始化摄像头参数。
-     *
-     * @param width 期望的采集宽度分辨率
-     * @param height 期望的采集高度分辨率
-     * @param fps 期望的采集帧率
-     * @return 初始化是否成功
-     * @throws VideoSdkError NDK 相机会话如果创建失败会抛出该异常
-     */
-    @Throws(VideoSdkError::class)
-    fun initialize(width: Int, height: Int, fps: Int): Boolean {
-        return nativeInitialize(nativeHandle, width, height, fps)
-    }
-
-    /**
-     * 开启摄像头采集并推流。
-     */
-    fun startPreview() {
-        nativeStartPreview(nativeHandle)
-    }
-
-    /**
-     * 停止摄像头采集。
-     */
-    fun stopPreview() {
-        nativeStopPreview(nativeHandle)
-    }
-
-    /**
-     * 翻转前后摄像头。
-     */
-    fun switchCamera() {
-        nativeSwitchCamera(nativeHandle)
-    }
-
-    /**
-     * 销毁底层实例，释放硬件相机设备句柄。
+     * 销毁底层实例
      */
     fun destroy() {
         if (nativeHandle != 0L) {
@@ -72,10 +50,7 @@ class CameraCapture {
 
     // --- Native JNI 接口声明 ---
     private external fun nativeCreate(): Long
+    private external fun nativePushOESTexture(handle: Long, textureId: Int, width: Int, height: Int, timestampNs: Long, transformMatrix: FloatArray?)
     private external fun nativeSetPreviewSurface(handle: Long, surface: Surface?)
-    private external fun nativeInitialize(handle: Long, width: Int, height: Int, fps: Int): Boolean
-    private external fun nativeStartPreview(handle: Long)
-    private external fun nativeStopPreview(handle: Long)
-    private external fun nativeSwitchCamera(handle: Long)
     private external fun nativeDestroy(handle: Long)
 }

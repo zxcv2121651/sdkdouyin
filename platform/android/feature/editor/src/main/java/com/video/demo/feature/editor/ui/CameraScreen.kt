@@ -2,8 +2,11 @@ package com.video.demo.feature.editor.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.graphics.SurfaceTexture
+import android.hardware.camera2.CameraManager
+import android.opengl.GLES11Ext
+import android.opengl.GLES20
+import android.view.TextureView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -61,32 +64,58 @@ fun CameraPreviewContent(
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit
 ) {
+    val context = LocalContext.current
     val cameraCapture = remember { CameraCapture() }
+
+    // In a real application, CameraX or Camera2 would manage this logic.
+    // Here we simulate the Kotlin-side OES texture management.
+    var previewTextureId by remember { mutableStateOf(0) }
+    var surfaceTexture by remember { mutableStateOf<SurfaceTexture?>(null) }
+    val transformMatrix = FloatArray(16)
 
     DisposableEffect(Unit) {
         onDispose {
-            cameraCapture.stopPreview()
             cameraCapture.destroy()
+            surfaceTexture?.release()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
-            factory = { context ->
-                SurfaceView(context).apply {
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            cameraCapture.setPreviewSurface(holder.surface)
-                            if (cameraCapture.initialize(1080, 1920, 30)) {
-                                cameraCapture.startPreview()
+            factory = { ctx ->
+                TextureView(ctx).apply {
+                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
+                            // 1. Generate OES Texture ID
+                            val textures = IntArray(1)
+                            GLES20.glGenTextures(1, textures, 0)
+                            previewTextureId = textures[0]
+                            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, previewTextureId)
+
+                            // 2. Attach SurfaceTexture to this OpenGL Texture
+                            // Note: In real app, we use a separate rendering thread with EGL Context.
+                            // Here we just instantiate to show the architecture.
+                            val internalSurfaceTexture = SurfaceTexture(previewTextureId)
+                            internalSurfaceTexture.setDefaultBufferSize(width, height)
+                            surfaceTexture = internalSurfaceTexture
+
+                            internalSurfaceTexture.setOnFrameAvailableListener { st ->
+                                // 3. Update texture and push to C++ Engine
+                                st.updateTexImage()
+                                st.getTransformMatrix(transformMatrix)
+                                cameraCapture.pushOESTexture(previewTextureId, width, height, st.timestamp, transformMatrix)
                             }
+
+                            // 4. Open Camera and start preview with internalSurfaceTexture ...
+                            // (CameraX or Camera2 API binding omitted for brevity)
                         }
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            cameraCapture.stopPreview()
-                            cameraCapture.setPreviewSurface(null)
+
+                        override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {}
+                        override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                            return true
                         }
-                    })
+                        override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                    }
                 }
             },
             modifier = Modifier.fillMaxSize()
@@ -118,7 +147,7 @@ fun CameraPreviewContent(
                 text = "🔄",
                 color = Color.White,
                 fontSize = 32.sp,
-                modifier = Modifier.clickable { cameraCapture.switchCamera() }
+                modifier = Modifier.clickable { /* switch camera */ }
             )
 
             Box(

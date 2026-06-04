@@ -1,7 +1,9 @@
 #include <jni.h>
 #include <memory>
+#include <vector>
 #include "JniExceptionHandler.h"
 #include "modules/camera/CameraCapture.h"
+#include <android/native_window_jni.h>
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_video_sdk_CameraCapture_nativeCreate(JNIEnv* env, jobject thiz) {
@@ -14,44 +16,25 @@ Java_com_video_sdk_CameraCapture_nativeCreate(JNIEnv* env, jobject thiz) {
     }
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_video_sdk_CameraCapture_nativeInitialize(JNIEnv* env, jobject thiz, jlong handle, jint width, jint height, jint fps) {
+extern "C" JNIEXPORT void JNICALL
+Java_com_video_sdk_CameraCapture_nativePushOESTexture(JNIEnv* env, jobject thiz, jlong handle, jint textureId, jint width, jint height, jlong timestampNs, jfloatArray matrix) {
     auto capturePtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::CameraCapture>*>(handle);
     if (!capturePtr || !(*capturePtr)) {
-        video_sdk::jni::JniExceptionHandler::throwKotlinException(env, "com/video/sdk/VideoSdkError$EngineError", "CameraCapture instance is null");
-        return JNI_FALSE;
+        return;
     }
 
-    try {
-        return (*capturePtr)->initialize(width, height, fps) ? JNI_TRUE : JNI_FALSE;
-    } catch (const std::exception& e) {
-        video_sdk::jni::JniExceptionHandler::throwKotlinException(env, "com/video/sdk/VideoSdkError$EngineError", e.what());
-        return JNI_FALSE;
+    float transformMatrix[16];
+    if (matrix != nullptr) {
+        env->GetFloatArrayRegion(matrix, 0, 16, transformMatrix);
+    } else {
+        // Identity matrix fallback
+        for(int i=0; i<16; i++) transformMatrix[i] = (i%5 == 0) ? 1.0f : 0.0f;
     }
-}
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_video_sdk_CameraCapture_nativeStartPreview(JNIEnv* env, jobject thiz, jlong handle) {
-    auto capturePtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::CameraCapture>*>(handle);
-    if (capturePtr && (*capturePtr)) {
-        (*capturePtr)->startPreview();
-    }
-}
+    // Convert nanoseconds (from SurfaceTexture) to milliseconds for internal SDK usage
+    int64_t timestampMs = timestampNs / 1000000;
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_video_sdk_CameraCapture_nativeStopPreview(JNIEnv* env, jobject thiz, jlong handle) {
-    auto capturePtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::CameraCapture>*>(handle);
-    if (capturePtr && (*capturePtr)) {
-        (*capturePtr)->stopPreview();
-    }
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_video_sdk_CameraCapture_nativeSwitchCamera(JNIEnv* env, jobject thiz, jlong handle) {
-    auto capturePtr = reinterpret_cast<std::shared_ptr<video_sdk::modules::CameraCapture>*>(handle);
-    if (capturePtr && (*capturePtr)) {
-        (*capturePtr)->switchCamera();
-    }
+    (*capturePtr)->pushOESTexture(static_cast<uint32_t>(textureId), width, height, timestampMs, transformMatrix);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -61,8 +44,6 @@ Java_com_video_sdk_CameraCapture_nativeDestroy(JNIEnv* env, jobject thiz, jlong 
         delete capturePtr;
     }
 }
-
-#include <android/native_window_jni.h>
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_video_sdk_CameraCapture_nativeSetPreviewSurface(JNIEnv* env, jobject thiz, jlong handle, jobject surface) {
