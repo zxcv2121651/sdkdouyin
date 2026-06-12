@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include "core/engine/FilterEngine.h"
+#include "rhi/interface/IRenderer.h"
 
 namespace video_sdk {
 namespace modules {
@@ -31,7 +32,7 @@ public:
     void clearAllEffects();
 
     // 被 RenderGraph 或 Player 调用：依次执行已挂载的特效
-    void processEffects(uint32_t inputTextureId, uint32_t outputTextureId, int width, int height);
+    void processEffects(std::shared_ptr<rhi::ITexture> inputTexture, std::shared_ptr<rhi::ITexture> outputTexture);
 
 private:
     float m_smoothingLevel = 0.0f;

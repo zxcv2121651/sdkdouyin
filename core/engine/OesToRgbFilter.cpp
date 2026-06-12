@@ -1,28 +1,5 @@
 #include "OesToRgbFilter.h"
-#include <iostream>
-
-extern void glUseProgram(uint32_t program);
-extern int glGetUniformLocation(uint32_t program, const char* name);
-extern int glGetAttribLocation(uint32_t program, const char* name);
-extern void glUniformMatrix4fv(int location, int count, bool transpose, const float* value);
-extern void glUniform1i(int location, int v0);
-extern void glActiveTexture(uint32_t texture);
-extern void glBindTexture(uint32_t target, uint32_t texture);
-extern void glViewport(int x, int y, int width, int height);
-extern void glDrawArrays(uint32_t mode, int first, int count);
-extern void glBindFramebuffer(uint32_t target, uint32_t framebuffer);
-extern void glEnableVertexAttribArray(uint32_t index);
-extern void glDisableVertexAttribArray(uint32_t index);
-extern void glVertexAttribPointer(uint32_t index, int size, uint32_t type, bool normalized, int stride, const void* pointer);
-extern void glClearColor(float red, float green, float blue, float alpha);
-extern void glClear(uint32_t mask);
-
-#define GL_TEXTURE0 0x84C0
-#define GL_TEXTURE_EXTERNAL_OES 0x8D65
-#define GL_FRAMEBUFFER 0x8D40
-#define GL_TRIANGLE_STRIP 0x0005
-#define GL_FLOAT 0x1406
-#define GL_COLOR_BUFFER_BIT 0x00004000
+#include <vector>
 
 namespace video_sdk {
 namespace core {
@@ -32,7 +9,7 @@ OesToRgbFilter::OesToRgbFilter(std::shared_ptr<rhi::IRenderer> renderer) : m_ren
 }
 
 OesToRgbFilter::~OesToRgbFilter() {
-    // 调用 renderer 的接口释放 programId
+    // RHI 接口会在析构时自动释放资源，无需手动调用 glDeleteProgram
 }
 
 void OesToRgbFilter::initShader() {
@@ -57,37 +34,26 @@ void OesToRgbFilter::initShader() {
         }
     )";
 
-    m_programId = m_renderer->compileShader(vertexShader, fragmentShader);
-
-    // 真实的 Location 获取
-    m_matrixLoc = glGetUniformLocation(m_programId, "uTextureMatrix");
-    m_textureLoc = glGetUniformLocation(m_programId, "uTexture");
-    m_posLoc = glGetAttribLocation(m_programId, "aPosition");
-    m_coordLoc = glGetAttribLocation(m_programId, "aTextureCoord");
+    m_shader = m_renderer->createShader(vertexShader, fragmentShader);
 }
 
-void OesToRgbFilter::render(uint32_t oesTextureId, rhi::FrameBufferObject* fbo, const float* matrix) {
-    if (!fbo || m_programId == 0) return;
+void OesToRgbFilter::render(std::shared_ptr<rhi::ITexture> oesTexture, std::shared_ptr<rhi::ITexture> outputTexture, const float* transformMatrix) {
+    if (!outputTexture || !oesTexture || !m_shader) return;
 
-    // 1. 绑定目标 FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo->fboId);
-    glViewport(0, 0, fbo->width, fbo->height);
+    // 1. 设置 RenderTarget (隐藏了 FBO 细节)
+    m_renderer->setRenderTarget(outputTexture);
+    m_renderer->clear(0.0f, 0.0f, 0.0f, 1.0f);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // 2. 绑定 Shader
+    m_renderer->bindShader(m_shader);
 
-    glUseProgram(m_programId);
+    // 3. 传入矩阵
+    m_renderer->setUniformMatrix4fv(m_shader, "uTextureMatrix", transformMatrix);
 
-    // 2. 传入相机矩阵
-    glUniformMatrix4fv(m_matrixLoc, 1, false, matrix);
+    // 4. 绑定纹理
+    m_renderer->bindTexture(m_shader, "uTexture", oesTexture, 0);
 
-    // 3. 绑定外部纹理
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_EXTERNAL_OES, oesTextureId);
-    glUniform1i(m_textureLoc, 0);
-
-    // 4. 顶点数据 (VBO 坐标) - 填满真实绘制指令
-    // 标准的 OpenGL NDC 坐标
+    // 5. 组装顶点数据并绘制 (隐藏了 glDrawArrays 和 VBO/VAO 细节)
     static const float vertexData[] = {
         -1.0f, -1.0f,
          1.0f, -1.0f,
@@ -95,7 +61,6 @@ void OesToRgbFilter::render(uint32_t oesTextureId, rhi::FrameBufferObject* fbo, 
          1.0f,  1.0f
     };
 
-    // 标准的纹理坐标 (Android Camera2 吐出的需要修正)
     static const float textureData[] = {
         0.0f, 0.0f,
         1.0f, 0.0f,
@@ -103,20 +68,16 @@ void OesToRgbFilter::render(uint32_t oesTextureId, rhi::FrameBufferObject* fbo, 
         1.0f, 1.0f
     };
 
-    glEnableVertexAttribArray(m_posLoc);
-    glVertexAttribPointer(m_posLoc, 2, GL_FLOAT, false, 0, vertexData);
+    // 假设 attr location 0 是 position, 1 是 texcoord
+    std::vector<rhi::VertexAttribute> attrs = {
+        {0, 2, 0, vertexData},
+        {1, 2, 0, textureData}
+    };
 
-    glEnableVertexAttribArray(m_coordLoc);
-    glVertexAttribPointer(m_coordLoc, 2, GL_FLOAT, false, 0, textureData);
+    m_renderer->drawArrays(5 /* GL_TRIANGLE_STRIP */, 0, 4, attrs);
 
-    // 5. 执行绘制
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    // 6. 收尾清理
-    glDisableVertexAttribArray(m_posLoc);
-    glDisableVertexAttribArray(m_coordLoc);
-    glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // 6. 恢复状态 (可选，RHI内部也可以处理)
+    m_renderer->setRenderTarget(nullptr);
 }
 
 } // namespace core
