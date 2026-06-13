@@ -23,14 +23,11 @@ void CameraSourceNode::updateOESTexture(uint32_t textureId, int width, int heigh
 }
 
 void CameraSourceNode::process(core::RenderContext& context) {
-    if (!m_outputTexture) return;
+    if (!m_outputFbo) return;
 
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_hasNewFrame && m_oesTextureId > 0) {
-        // Here we need to wrap the external texture ID into an RHI ITexture
-        auto oesTex = context.renderer->wrapExternalOESTexture(m_oesTextureId, m_width, m_height);
-
-        m_oesFilter->render(oesTex, m_outputTexture, m_matrix);
+        m_oesFilter->render(m_oesTextureId, m_outputFbo, m_matrix);
         // Do not set m_hasNewFrame = false here immediately if we need to repeatedly render the same frame (e.g., paused preview)
         // But for camera, it's a constant stream anyway.
     }

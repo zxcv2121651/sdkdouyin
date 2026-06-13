@@ -3,25 +3,21 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 #include "rhi/interface/IRenderer.h"
+#include "rhi/DefaultFBOPool.h"
 
 namespace video_sdk {
 namespace core {
 
-/**
- * @brief 渲染上下文。
- * 使用纯正的 RHI ITexture 代替暴露底层细节的 FrameBufferObject。
- */
 struct RenderContext {
     std::shared_ptr<rhi::IRenderer> renderer;
+    std::shared_ptr<rhi::IFBOPool> fboPool;
     int targetWidth;
     int targetHeight;
     int64_t currentPts;
 };
 
-/**
- * @brief 渲染管线节点基类。
- */
 class RenderNode {
 public:
     explicit RenderNode(const std::string& name);
@@ -32,9 +28,8 @@ public:
     void addInputNode(std::shared_ptr<RenderNode> node);
     const std::vector<std::shared_ptr<RenderNode>>& getInputNodes() const { return m_inputs; }
 
-    // 使用 RHI Texture 作为输出目标
-    void setOutputTexture(std::shared_ptr<rhi::ITexture> texture) { m_outputTexture = texture; }
-    std::shared_ptr<rhi::ITexture> getOutputTexture() const { return m_outputTexture; }
+    void setOutputFbo(rhi::FrameBufferObject* fbo) { m_outputFbo = fbo; }
+    rhi::FrameBufferObject* getOutputFbo() const { return m_outputFbo; }
 
     virtual void prepare(RenderContext& context) {}
     virtual void process(RenderContext& context) = 0;
@@ -43,10 +38,9 @@ public:
 protected:
     std::string m_name;
     std::vector<std::shared_ptr<RenderNode>> m_inputs;
-    std::shared_ptr<rhi::ITexture> m_outputTexture;
+    rhi::FrameBufferObject* m_outputFbo = nullptr;
 };
 
-// ... SourceNode, FilterNode, TransitionNode ...
 class SourceNode : public RenderNode {
 public:
     explicit SourceNode(const std::string& name, uint32_t externalTextureId);
@@ -71,5 +65,5 @@ private:
     float m_progress;
 };
 
-} // namespace core
-} // namespace video_sdk
+}
+}

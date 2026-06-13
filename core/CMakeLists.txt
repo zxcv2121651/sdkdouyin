@@ -17,4 +17,4 @@ add_library(VideoCore STATIC ${CORE_SRC})
 target_include_directories(VideoCore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(TestRenderGraph engine/TestRenderGraph.cpp)
-target_link_libraries(TestRenderGraph PRIVATE VideoCore)
+target_link_libraries(TestRenderGraph PRIVATE VideoCore VideoRHI)

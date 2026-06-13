@@ -1,20 +1,33 @@
 #include "RenderNode.h"
+#include "RenderGraph.h"
+#include "rhi/DefaultFBOPool.h"
 #include <iostream>
 #include <memory>
 
-// 一个极简的 Mock Texture 来让测试编译通过，实际引擎会用 Renderer 产生
-class MockTexture : public video_sdk::rhi::ITexture {
+class MockRenderer : public video_sdk::rhi::IRenderer {
 public:
-    uint32_t id;
-    MockTexture(uint32_t i) : id(i) {}
-    int getWidth() const override { return 1920; }
-    int getHeight() const override { return 1080; }
-    video_sdk::rhi::TextureFormat getFormat() const override { return video_sdk::rhi::TextureFormat::RGBA8; }
-    uint32_t getNativeId() const override { return id; }
+    uint32_t fboCounter = 1;
+    void initialize() override {}
+    void destroy() override {}
+    const video_sdk::rhi::RendererCapabilities& getCapabilities() const override { static video_sdk::rhi::RendererCapabilities c; return c; }
+
+    video_sdk::rhi::FrameBufferObject* acquireFBO(int width, int height) override {
+        std::cout << "[MockRenderer] Actually allocating FBO: " << fboCounter << std::endl;
+        return new video_sdk::rhi::FrameBufferObject{fboCounter++, fboCounter * 10, width, height};
+    }
+
+    void releaseFBO(video_sdk::rhi::FrameBufferObject* fbo) override {
+        std::cout << "[MockRenderer] Releasing FBO: " << fbo->fboId << std::endl;
+        delete fbo;
+    }
+
+    uint32_t compileShader(const std::string& v, const std::string& f) override { return 1; }
+    uint32_t compileComputeShader(const std::string& c) override { return 1; }
+    void dispatchCompute(uint32_t p, int x, int y, int z) override {}
 };
 
 int main() {
-    std::cout << "--- Testing Pure RHI RenderGraph ---" << std::endl;
+    std::cout << "--- Testing FBO Pool RenderGraph ---" << std::endl;
 
     auto sourceA = std::make_shared<video_sdk::core::SourceNode>("VideoSourceA", 100);
     auto sourceB = std::make_shared<video_sdk::core::SourceNode>("VideoSourceB", 101);
@@ -22,49 +35,40 @@ int main() {
     auto beautyFilter = std::make_shared<video_sdk::core::FilterNode>("BeautyFilter", "Bilateral");
     beautyFilter->addInputNode(sourceA);
 
-    auto lutFilter = std::make_shared<video_sdk::core::FilterNode>("LUTFilter", "CyberpunkLUT");
-    lutFilter->addInputNode(beautyFilter);
-
     auto transition = std::make_shared<video_sdk::core::TransitionNode>("CrossfadeMixer", 0.5f);
-    transition->addInputNode(lutFilter);
-    transition->addInputNode(sourceB); // sourceB is the next clip
+    transition->addInputNode(beautyFilter);
+    transition->addInputNode(sourceB);
 
-    std::cout << "[RenderGraph] Compiled successfully." << std::endl;
+    video_sdk::core::RenderGraph graph;
+    graph.addNode(sourceA);
+    graph.addNode(sourceB);
+    graph.addNode(beautyFilter);
+    graph.setOutputNode(transition);
 
-    // --- 模拟渲染过程 ---
+    graph.compile();
+
+    auto mockRenderer = std::make_shared<MockRenderer>();
+    auto fboPool = std::make_shared<video_sdk::rhi::DefaultFBOPool>(mockRenderer);
+
     video_sdk::core::RenderContext ctx;
+    ctx.renderer = mockRenderer;
+    ctx.fboPool = fboPool;
     ctx.targetWidth = 1080;
     ctx.targetHeight = 1920;
     ctx.currentPts = 33000;
 
-    std::cout << "\n=== [RenderGraph] Starting Frame Rendering ===" << std::endl;
+    std::cout << "\n=== [RenderGraph] Frame 1 (Cold Start) ===" << std::endl;
+    graph.render(ctx);
 
-    // 假设这些是 RHI 分配出来的 Texture
-    auto tex1 = std::make_shared<MockTexture>(1);
-    auto tex2 = std::make_shared<MockTexture>(2);
-    auto tex3 = std::make_shared<MockTexture>(3);
-    auto tex4 = std::make_shared<MockTexture>(4);
-    auto tex5 = std::make_shared<MockTexture>(5);
+    ctx.currentPts = 66000;
+    std::cout << "\n=== [RenderGraph] Frame 2 (Should reuse pooled FBOs) ===" << std::endl;
+    graph.render(ctx);
 
-    // 1. Source Nodes
-    sourceB->setOutputTexture(tex1);
-    sourceB->process(ctx);
+    ctx.currentPts = 99000;
+    std::cout << "\n=== [RenderGraph] Frame 3 (Should reuse pooled FBOs) ===" << std::endl;
+    graph.render(ctx);
 
-    sourceA->setOutputTexture(tex2);
-    sourceA->process(ctx);
-
-    // 2. Filters
-    beautyFilter->setOutputTexture(tex3);
-    beautyFilter->process(ctx);
-
-    lutFilter->setOutputTexture(tex4);
-    lutFilter->process(ctx);
-
-    // 3. Transition (Mix)
-    transition->setOutputTexture(tex5);
-    transition->process(ctx);
-
-    std::cout << "=== [RenderGraph] Frame Rendering Completed ===\n" << std::endl;
+    std::cout << "\n=== [RenderGraph] Testing Completed ===\n" << std::endl;
 
     return 0;
 }

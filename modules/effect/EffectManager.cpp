@@ -4,56 +4,50 @@
 namespace video_sdk {
 namespace modules {
 
-EffectManager::EffectManager(std::shared_ptr<core::FilterEngine> engine) : m_filterEngine(engine) {
-}
+EffectManager::EffectManager(std::shared_ptr<core::FilterEngine> engine) : m_filterEngine(engine) {}
 
 EffectManager::~EffectManager() {
+    clearAllEffects();
 }
 
 void EffectManager::setBeautyParams(float smoothing, float faceSlimming, float eyeEnlarging) {
     m_smoothingLevel = smoothing;
     m_faceSlimmingLevel = faceSlimming;
     m_eyeEnlargingLevel = eyeEnlarging;
-    std::cout << "[EffectManager] Beauty params updated." << std::endl;
+    std::cout << "[EffectManager] Updated Beauty Params: smoothing=" << smoothing << std::endl;
 }
 
 void EffectManager::applyLutFilter(const std::string& lutPath, float intensity) {
-    // 工业级实现：从本地路径加载 LUT png，并作为 3D/2D Texture 注册到 FilterEngine。
-    m_activeFilters.push_back({"LUT_" + lutPath, intensity});
-    std::cout << "[EffectManager] Applied LUT filter: " << lutPath << std::endl;
+    // 工业级实现：读取 lutPath，解码图片，上传为 3D Texture 并返回 textureId
+    // 这里将其作为记录加入配置队列
+    m_activeFilters.push_back({lutPath, intensity});
+    std::cout << "[EffectManager] Added LUT Filter: " << lutPath << " with intensity " << intensity << std::endl;
 }
 
 void EffectManager::clearAllEffects() {
     m_activeFilters.clear();
-    m_smoothingLevel = 0;
-    m_faceSlimmingLevel = 0;
-    m_eyeEnlargingLevel = 0;
+    m_smoothingLevel = 0.0f;
+    m_faceSlimmingLevel = 0.0f;
+    m_eyeEnlargingLevel = 0.0f;
 }
 
-void EffectManager::processEffects(std::shared_ptr<rhi::ITexture> inputTexture, std::shared_ptr<rhi::ITexture> outputTexture) {
-    if (!m_filterEngine || !inputTexture || !outputTexture) return;
+void EffectManager::processEffects(uint32_t inputTextureId, uint32_t outputTextureId, int width, int height) {
+    if (!m_filterEngine) return;
 
-    // TODO: In a real implementation with multiple filters, we need a ping-pong buffer mechanism
-    // using renderer->createTexture2D(...) to chain multiple filter inputs and outputs.
-    // For this mock, we just apply the last one, or apply beauty directly to output.
+    // 1. 如果开启了美颜，先过 Compute Shader 磨皮
+    uint32_t currentTexture = inputTextureId;
 
-    std::shared_ptr<rhi::ITexture> currentTexture = inputTexture;
-
-    // 如果启用了美颜（假设美颜是一个 Compute Shader Filter）
-    if (m_smoothingLevel > 0.0f) {
-        // Here we just apply it directly to output for simplicity of the mock.
-        m_filterEngine->applyFilter("Beauty_Compute", currentTexture, outputTexture);
-        return;
+    if (m_smoothingLevel > 0.01f) {
+        // 由于需要中间流转，实际可能需要申请临时的 ping-pong FBO
+        m_filterEngine->applyBeautyCompute(currentTexture, outputTextureId, width, height, m_smoothingLevel);
+        currentTexture = outputTextureId; // 简易状态流转
     }
 
-    // 循环挂载普通的片段着色器滤镜
+    // 2. 依次叠加滤镜
     for (const auto& config : m_activeFilters) {
-        m_filterEngine->applyFilter(config.name, currentTexture, outputTexture);
-        return; // Just mock one pass for now
+        m_filterEngine->applyFilter(config.name, currentTexture, outputTextureId, width, height);
+        currentTexture = outputTextureId;
     }
-
-    // 如果没有任何滤镜，只需将 inputTexture 拷贝到 outputTexture (使用一个 copy shader)
-    // m_filterEngine->applyFilter("Copy", inputTexture, outputTexture);
 }
 
 } // namespace modules

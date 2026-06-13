@@ -1,57 +1,49 @@
 #pragma once
+
 #include "rhi/interface/IRenderer.h"
-#include <map>
-#include <string>
+#include <unordered_map>
+#include <vector>
+#include <mutex>
+#include "rhi/gles/EGLCore.h"
 
 namespace video_sdk {
 namespace rhi {
 
-class GLESShader : public IShader {
-public:
-    uint32_t programId;
-    std::map<std::string, int> uniformLocations;
-    std::map<std::string, int> attribLocations;
-    ~GLESShader();
-};
-
-class GLESTexture : public ITexture {
-public:
-    uint32_t textureId;
-    int width;
-    int height;
-    TextureFormat format;
-    uint32_t fboId = 0; // 如果用作 RenderTarget，顺便持有一个 FBO
-
-    GLESTexture(int w, int h, TextureFormat fmt);
-    ~GLESTexture() override;
-
-    int getWidth() const override { return width; }
-    int getHeight() const override { return height; }
-    TextureFormat getFormat() const override { return format; }
-    uint32_t getNativeId() const override { return textureId; }
-};
-
+/**
+ * @brief OpenGL ES 渲染后端实现。
+ * 结合 EGLCore 提供跨平台的 GLES 状态机管理与 FBO 对象池。
+ */
 class GLESRenderer : public IRenderer {
 public:
     GLESRenderer();
     ~GLESRenderer() override;
 
-    std::shared_ptr<ITexture> createTexture2D(int width, int height, TextureFormat format) override;
-    std::shared_ptr<ITexture> wrapExternalOESTexture(uint32_t textureId, int width, int height) override;
-    std::shared_ptr<IShader> createShader(const std::string& vertexSource, const std::string& fragmentSource) override;
+    void initialize() override;
+    void destroy() override;
 
-    void setRenderTarget(std::shared_ptr<ITexture> texture) override;
-    void clear(float r, float g, float b, float a) override;
-    void bindShader(std::shared_ptr<IShader> shader) override;
-    void bindTexture(std::shared_ptr<IShader> shader, const std::string& uniformName, std::shared_ptr<ITexture> texture, int slot) override;
-    void setUniformMatrix4fv(std::shared_ptr<IShader> shader, const std::string& name, const float* matrix) override;
-    void drawArrays(int mode, int first, int count, const std::vector<VertexAttribute>& attributes) override;
+    const RendererCapabilities& getCapabilities() const override { return m_caps; }
 
-    void presentToScreen() override;
-    std::string getRendererType() const override { return "OpenGLES"; }
+    FrameBufferObject* acquireFBO(int width, int height) override;
+    void releaseFBO(FrameBufferObject* fbo) override;
+
+    uint32_t compileShader(const std::string& vertexSource, const std::string& fragmentSource) override;
+    uint32_t compileComputeShader(const std::string& computeSource) override;
+    void dispatchCompute(uint32_t programId, int numGroupsX, int numGroupsY, int numGroupsZ) override;
 
 private:
-    uint32_t compileShaderInternal(uint32_t type, const std::string& source);
+    void probeCapabilities();
+
+private:
+    RendererCapabilities m_caps;
+    EGLCore m_eglCore;
+
+    // FBO 缓存池：避免每帧频繁 glGenFramebuffers / glGenTextures 导致显存碎片化
+    std::mutex m_fboMutex;
+
+    // key=width_height, value=vector of FBOs
+    struct FBOKey { int w, h; bool operator==(const FBOKey& o) const { return w == o.w && h == o.h; } };
+    struct FBOKeyHash { size_t operator()(const FBOKey& k) const { return k.w ^ (k.h << 1); } };
+    std::unordered_map<FBOKey, std::vector<FrameBufferObject*>, FBOKeyHash> m_fboPool;
 };
 
 } // namespace rhi
