@@ -44,3 +44,6 @@ target_link_libraries(VideoSDKCore
 if(ANDROID)
     target_link_libraries(VideoSDKCore PRIVATE log android EGL GLESv3)
 endif()
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)

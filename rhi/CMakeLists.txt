@@ -10,6 +10,3 @@ add_library(VideoRHI STATIC ${RHI_SRC})
 target_include_directories(VideoRHI PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/interface)
 target_sources(VideoRHI PRIVATE
 )
-target_sources(VideoRHI PRIVATE
-    DefaultFBOPool.cpp
-)
