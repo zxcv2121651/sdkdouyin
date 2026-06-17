@@ -1,14 +1,8 @@
-#include "video_sdk_c_api.h"
+#include "../../include/video_sdk_c_api.h"
 #include "modules/player/VideoPlayer.h"
 #include "modules/camera/CameraCapture.h"
 #include <memory>
 #include <iostream>
-
-// ============================================================================
-// Internal Cast Helpers
-// ============================================================================
-// We store std::shared_ptr inside the opaque handle pointers.
-// This ensures memory safety across the C boundary.
 
 struct VS_Player_Opaque {
     std::shared_ptr<video_sdk::modules::VideoPlayer> instance;
@@ -18,9 +12,6 @@ struct VS_Camera_Opaque {
     std::shared_ptr<video_sdk::modules::CameraCapture> instance;
 };
 
-// ============================================================================
-// Global API
-// ============================================================================
 VS_Result vs_global_initialize() {
     try {
         std::cout << "[VideoSDK C-API] Global Initialized." << std::endl;
@@ -34,9 +25,6 @@ void vs_global_destroy() {
     std::cout << "[VideoSDK C-API] Global Destroyed." << std::endl;
 }
 
-// ============================================================================
-// Player API
-// ============================================================================
 VS_Result vs_player_create(VS_PlayerHandle* out_handle) {
     if (!out_handle) return VS_ERROR_INVALID_ARGUMENT;
     try {
@@ -95,9 +83,6 @@ VS_Result vs_player_seek(VS_PlayerHandle handle, int64_t time_ms) {
     }
 }
 
-// ============================================================================
-// Camera API
-// ============================================================================
 VS_Result vs_camera_create(VS_CameraHandle* out_handle) {
     if (!out_handle) return VS_ERROR_INVALID_ARGUMENT;
     try {
