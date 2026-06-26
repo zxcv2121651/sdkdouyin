@@ -7,7 +7,6 @@ using namespace video_sdk::core;
 int main() {
     std::cout << "--- Testing NLE Model Serialization & Compiler ---" << std::endl;
 
-    // 1. 构建 NLE 草稿模型
     auto project = std::make_shared<NLEProject>();
     project->projectId = "test_project_888";
 
@@ -19,9 +18,11 @@ int main() {
     clip1->id = "clip_01";
     clip1->resourcePath = "/sdcard/1.mp4";
 
+    // Add Beauty Filter to test the Compute Shader path
     auto effect1 = std::make_shared<NLEEffect>();
     effect1->id = "eff_1";
-    effect1->effectName = "RetroFilter";
+    effect1->effectName = "BeautyFilter";
+    effect1->intensity = 0.8f;
     clip1->effects.push_back(effect1);
 
     auto clip2 = std::make_shared<NLETrackSlot>();
@@ -32,17 +33,14 @@ int main() {
     videoTrack->addSlot(clip2);
     project->addTrack(videoTrack);
 
-    // 2. 验证序列化
     std::cout << "\n[Serialization] Generating JSON Draft:" << std::endl;
     std::string draftJson = project->toJson();
     std::cout << draftJson << std::endl;
 
-    // 3. 验证 NLE Compiler 自动编译生成 RenderGraph
     std::cout << "\n[Compiler] Translating Draft to RenderGraph:" << std::endl;
     NLECompiler compiler;
     auto graph = compiler.compileProject(project);
 
-    // 4. 执行生成的 RenderGraph
     if (graph) {
         std::cout << "\n[RenderGraph] Executing generated pipeline:" << std::endl;
         RenderContext ctx;
