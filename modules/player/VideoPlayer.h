@@ -1,3 +1,5 @@
+
+#include "core/nle/NLEPreloadManager.h"
 #pragma once
 #include <string>
 #include <cstdint>
@@ -39,7 +41,12 @@ public:
     // 是否正在播放
     bool isPlaying() const { return m_isPlaying; }
 
+public:
+    void setProject(std::shared_ptr<core::NLEProject> project);
+    void updatePlaybackProgress(); // Mock driver for testing
+
 private:
+    std::shared_ptr<core::NLEPreloadManager> m_preloadManager;
     bool m_isPlaying = false;
     int64_t m_currentPositionMs = 0;
     void* m_window = nullptr;

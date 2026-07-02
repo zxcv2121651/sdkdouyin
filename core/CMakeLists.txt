@@ -28,6 +28,7 @@ add_executable(TestRenderThread engine/TestRenderThread.cpp)
 target_link_libraries(TestRenderThread PRIVATE VideoCore VideoRHI)
 target_sources(VideoCore PRIVATE
     nle/NLEModel.cpp
+    nle/NLEPreloadManager.cpp
     nle/NLECompiler.cpp
 )
 add_executable(TestNLECompiler nle/TestNLECompiler.cpp)
