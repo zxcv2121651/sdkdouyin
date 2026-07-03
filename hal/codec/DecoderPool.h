@@ -12,6 +12,7 @@
 #include "hal/interface/IDecoderPool.h"
 #include "media/codec/SoftwareVideoDecoder.h"
 #include "hal/codec/AndroidMediaCodecDecoder.h"
+#include "core/utils/MemoryManager.h"
 
 namespace video_sdk {
 namespace hal {
@@ -20,8 +21,10 @@ namespace hal {
  * @brief 商业级解码器池：实现 LRU 缓存策略 + Pin/Unpin 状态保护 + 异步预读。
  * 解决移动端硬件解码器实例化缓慢及实例数量受限的问题。
  */
-class DecoderPool : public IDecoderPool {
+class DecoderPool : public IDecoderPool, public core::IMemoryPressureListener, public std::enable_shared_from_this<DecoderPool> {
 public:
+    void init();
+    void onMemoryPressure(core::MemoryPressureLevel level) override;
     explicit DecoderPool(size_t maxCapacity = 8);
     ~DecoderPool() override;
 

@@ -121,3 +121,17 @@ VS_Result vs_camera_push_oes_texture(VS_CameraHandle handle, uint32_t texture_id
         return VS_ERROR_ENGINE_INTERNAL;
     }
 }
+
+#include "core/utils/MemoryManager.h"
+
+VS_Result vs_global_notify_memory_pressure(int level) {
+    try {
+        video_sdk::core::MemoryPressureLevel mappedLevel =
+            (level == 1) ? video_sdk::core::MemoryPressureLevel::CRITICAL : video_sdk::core::MemoryPressureLevel::MODERATE;
+
+        video_sdk::core::MemoryManager::getInstance().notifyMemoryPressure(mappedLevel);
+        return VS_SUCCESS;
+    } catch (...) {
+        return VS_ERROR_ENGINE_INTERNAL;
+    }
+}

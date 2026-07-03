@@ -71,6 +71,7 @@ namespace modules {
 void VideoPlayer::setProject(std::shared_ptr<core::NLEProject> project) {
     // 初始化 PreloadManager 并注入工程模型
     auto decoderPool = std::make_shared<hal::DecoderPool>(8);
+    decoderPool->init();
     m_preloadManager = std::make_shared<core::NLEPreloadManager>(decoderPool);
     m_preloadManager->setProject(project);
     std::cout << "[VideoPlayer] NLEProject injected, PreloadManager initialized." << std::endl;

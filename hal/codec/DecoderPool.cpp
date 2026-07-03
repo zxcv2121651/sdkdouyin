@@ -173,4 +173,16 @@ void DecoderPool::preloadHardwareDecoderAsync(const std::string& assetPath, uint
 }
 
 } // namespace hal
+
+namespace hal {
+void DecoderPool::init() {
+    core::MemoryManager::getInstance().addListener(weak_from_this());
+}
+
+void DecoderPool::onMemoryPressure(core::MemoryPressureLevel level) {
+    std::cout << "[DecoderPool] Handling Memory Pressure Event, evicting all unpinned decoders..." << std::endl;
+    evictAllUnpinned();
+}
+
+} // namespace hal
 } // namespace video_sdk
