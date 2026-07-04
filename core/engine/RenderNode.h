@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include "rhi/interface/IRenderer.h"
+#include "core/include/IFBOPool.h"
 
 namespace video_sdk {
 namespace core {
@@ -15,6 +16,7 @@ namespace core {
  */
 struct RenderContext {
     std::shared_ptr<rhi::IRenderer> renderer;
+    std::shared_ptr<IFBOPool> fboPool;
     int targetWidth;
     int targetHeight;
     int64_t currentPts;
