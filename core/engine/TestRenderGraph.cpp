@@ -6,7 +6,8 @@ using namespace video_sdk::core;
 int main() {
     std::cout << "--- Testing RenderGraph ---" << std::endl;
 
-    RenderGraph graph;
+    auto threadPool = std::make_shared<ThreadPool>(4);
+    RenderGraph graph(threadPool);
 
     // 创建节点
     auto sourceA = std::make_shared<SourceNode>("VideoSourceA", 100);

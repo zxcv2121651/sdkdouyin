@@ -3,42 +3,46 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <atomic>
 #include "RenderNode.h"
 #include "rhi/interface/IRenderer.h"
+#include "core/utils/ThreadPool.h"
 
 namespace video_sdk {
 namespace core {
 
 /**
- * @brief 有向无环图渲染管线引擎。
- * 负责解析节点的拓扑依赖关系，并自动分配/回收 FBO，确保执行顺序正确。
+ * @brief 高性能多线程有向无环图 (DAG) 渲染管线引擎。
+ * 基于 Data-flow 模型，使用 ThreadPool 并发执行拓扑层级相同的节点。
  */
 class RenderGraph {
 public:
-    RenderGraph();
+    // 初始化时注入一个全局共享的线程池，避免频繁创建线程
+    explicit RenderGraph(std::shared_ptr<ThreadPool> threadPool);
     ~RenderGraph();
 
-    // 添加节点到图中
     void addNode(std::shared_ptr<RenderNode> node);
-
-    // 设置该图最终输出的目标节点
     void setOutputNode(std::shared_ptr<RenderNode> node);
 
-    // 编译图：进行拓扑排序，生成执行序列
+    // 编译图：建立静态的依赖计数和子节点邻接表
     bool compile();
 
-    // 渲染一帧
+    // 并发渲染一帧，阻塞直到整个图渲染完毕
     void render(RenderContext& context);
 
 private:
     std::vector<std::shared_ptr<RenderNode>> m_nodes;
     std::shared_ptr<RenderNode> m_outputNode;
 
-    // 拓扑排序后的执行序列
-    std::vector<std::shared_ptr<RenderNode>> m_executionSequence;
+    std::shared_ptr<ThreadPool> m_threadPool;
 
-    // Kahn's 算法进行拓扑排序
-    bool topologicalSort();
+    // 编译产物：每个节点的初始入度 (前置依赖数量)
+    std::unordered_map<std::shared_ptr<RenderNode>, int> m_initialInDegree;
+
+    // 编译产物：邻接表 (当前节点执行完毕后，需要通知哪些子节点)
+    std::unordered_map<std::shared_ptr<RenderNode>, std::vector<std::shared_ptr<RenderNode>>> m_adjList;
+
+    bool buildDependencies();
 };
 
 } // namespace core

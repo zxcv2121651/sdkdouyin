@@ -25,6 +25,7 @@ target_sources(VideoCore PRIVATE
 target_sources(VideoCore PRIVATE
     utils/RenderThread.cpp
     utils/MemoryManager.cpp
+    utils/ThreadPool.cpp
 )
 add_executable(TestRenderThread engine/TestRenderThread.cpp)
 target_link_libraries(TestRenderThread PRIVATE VideoCore VideoRHI)
