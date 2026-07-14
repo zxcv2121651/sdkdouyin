@@ -50,6 +50,7 @@ void VideoPlayer::pause() {
 
 void VideoPlayer::seekTo(int64_t timestampMs) {
     m_currentPositionMs = timestampMs;
+    if (m_preloadManager) m_preloadManager->onSeek(timestampMs);
     // 使用 postTaskAndReply 可以让 UI 层阻塞等待 seek 完成，避免花屏
     m_renderThread->postTaskAndReply([this, timestampMs]() {
         std::cout << "[VideoPlayer] Seeked to " << timestampMs << "ms on RenderThread." << std::endl;
@@ -61,5 +62,27 @@ int64_t VideoPlayer::getCurrentPosition() const {
     return m_currentPositionMs;
 }
 
+} // namespace modules
+} // namespace video_sdk
+namespace video_sdk {
+namespace modules {
+
+
+void VideoPlayer::setProject(std::shared_ptr<core::NLEProject> project) {
+    // 初始化 PreloadManager 并注入工程模型
+    auto decoderPool = std::make_shared<hal::DecoderPool>(8);
+    decoderPool->init();
+    m_preloadManager = std::make_shared<core::NLEPreloadManager>(decoderPool);
+    m_preloadManager->setProject(project);
+    std::cout << "[VideoPlayer] NLEProject injected, PreloadManager initialized." << std::endl;
+}
+
+void VideoPlayer::updatePlaybackProgress() {
+    // 这是一个 Mock 函数。真实的 SDK 中，这个函数应该由底层的 AVSyncClock 或者 RenderThreadSyncLoop
+    // 每渲染一帧时回调上来。
+    if (m_preloadManager) {
+        m_preloadManager->updatePlayhead(m_currentPositionMs);
+    }
+}
 } // namespace modules
 } // namespace video_sdk

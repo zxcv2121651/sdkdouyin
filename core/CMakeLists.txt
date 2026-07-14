@@ -1,7 +1,8 @@
 file(GLOB_RECURSE CORE_SRC
     "engine/*.cpp"
     "engine/RenderNode.cpp"
-    "engine/RenderGraph.cpp"
+    "engine/RenderGraph.cpp
+    engine/DefaultFBOPool.cpp"
     "engine/GlMock.cpp"
     "engine/OesToRgbFilter.cpp"
     "timeline/*.cpp"
@@ -23,11 +24,14 @@ target_sources(VideoCore PRIVATE
 )
 target_sources(VideoCore PRIVATE
     utils/RenderThread.cpp
+    utils/MemoryManager.cpp
+    utils/ThreadPool.cpp
 )
 add_executable(TestRenderThread engine/TestRenderThread.cpp)
 target_link_libraries(TestRenderThread PRIVATE VideoCore VideoRHI)
 target_sources(VideoCore PRIVATE
     nle/NLEModel.cpp
+    nle/NLEPreloadManager.cpp
     nle/NLECompiler.cpp
 )
 add_executable(TestNLECompiler nle/TestNLECompiler.cpp)

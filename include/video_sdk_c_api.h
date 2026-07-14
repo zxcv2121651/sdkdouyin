@@ -33,6 +33,9 @@ typedef struct VS_Timeline_Opaque* VS_TimelineHandle;
 // ============================================================================
 VS_Result vs_global_initialize();
 void vs_global_destroy();
+// 通知底层引擎当前系统的内存压力等级 (如 Android onTrimMemory)
+// level: 0=Moderate, 1=Critical
+VS_Result vs_global_notify_memory_pressure(int level);
 
 // ============================================================================
 // Engine (核心渲染引擎) API

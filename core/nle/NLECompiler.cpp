@@ -12,7 +12,8 @@ std::shared_ptr<RenderGraph> NLECompiler::compileProject(std::shared_ptr<NLEProj
     if (!project) return nullptr;
 
     std::cout << "[NLECompiler] Starting to translate NLEProject (ID: " << project->projectId << ") into RenderGraph..." << std::endl;
-    auto graph = std::make_shared<RenderGraph>();
+    auto threadPool = std::make_shared<ThreadPool>(4);
+    auto graph = std::make_shared<RenderGraph>(threadPool);
 
     std::shared_ptr<RenderNode> previousNode = nullptr;
 
